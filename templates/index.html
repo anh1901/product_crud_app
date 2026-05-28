@@ -9,90 +9,73 @@
     <link href="/static/css/style.css" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="dark">
-        <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-4">
             <a class="navbar-brand fw-bold" href="#">
-                <i class="bi bi-box-seam me-2"></i>Product Manager
+                <i class="bi bi-grid-1x2-fill me-2"></i>Product Dashboard
             </a>
-            <button class="btn btn-warning position-relative" onclick="toggleCart()">
-                <i class="bi bi-cart3 me-1"></i>Cart
-                <span class="badge bg-dark ms-1" id="cartCount">0</span>
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <div class="input-group input-group-sm" style="width:280px">
+                    <span class="input-group-text bg-dark border-secondary text-light"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control bg-dark border-secondary text-light" id="searchInput" placeholder="Search name, category, price...">
+                </div>
+                <button class="btn btn-warning btn-sm position-relative" onclick="toggleCart()">
+                    <i class="bi bi-cart3 me-1"></i>Cart
+                    <span class="badge bg-danger rounded-pill ms-1" id="cartCount">0</span>
+                </button>
+            </div>
         </div>
     </nav>
 
-    <div class="container py-4">
-        <!-- Action Bar -->
+    <div class="container-fluid px-4 py-4">
+        <!-- Stats Row -->
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" id="searchInput" placeholder="Search by name, category, or price...">
-                </div>
-            </div>
-            <div class="col-md-8 text-md-end">
-                <button class="btn btn-success me-2" onclick="showAddModal()">
-                    <i class="bi bi-plus-lg me-1"></i>Add Product
-                </button>
-                <button class="btn btn-outline-primary" onclick="showImportModal()">
-                    <i class="bi bi-upload me-1"></i>Import Products
-                </button>
-            </div>
-        </div>
-
-        <!-- Stats -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm bg-primary-subtle">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-1">Total Products</h6>
-                        <h3 class="mb-0" id="statTotal">0</h3>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card stat-card-primary">
+                    <div class="stat-icon"><i class="bi bi-box-seam-fill"></i></div>
+                    <div>
+                        <div class="stat-label">Total Products</div>
+                        <div class="stat-value" id="statTotal">0</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm bg-success-subtle">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-1">Categories</h6>
-                        <h3 class="mb-0" id="statCategories">0</h3>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card stat-card-success">
+                    <div class="stat-icon"><i class="bi bi-tags-fill"></i></div>
+                    <div>
+                        <div class="stat-label">Categories</div>
+                        <div class="stat-value" id="statCategories">0</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm bg-info-subtle">
-                    <div class="card-body text-center">
-                        <h6 class="text-muted mb-1">Avg. Price</h6>
-                        <h3 class="mb-0" id="statAvgPrice">0₫</h3>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card stat-card-info">
+                    <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+                    <div>
+                        <div class="stat-label">Avg. Price</div>
+                        <div class="stat-value" id="statAvgPrice">0₫</div>
                     </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="d-flex gap-2 h-100 align-items-stretch">
+                    <button class="btn btn-success flex-fill d-flex align-items-center justify-content-center gap-2" onclick="showAddModal()">
+                        <i class="bi bi-plus-circle-fill fs-5"></i>
+                        <span>Add Product</span>
+                    </button>
+                    <button class="btn btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-2" onclick="showImportModal()">
+                        <i class="bi bi-cloud-upload-fill fs-5"></i>
+                        <span>Import</span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Product Table -->
-        <div class="card border-0 shadow-sm">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0 align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Name</th>
-                                <th>Category</th>
-                                <th>Price</th>
-                                <th>Description</th>
-                                <th class="text-end">Actions</th>
-                                <th style="width:80px"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="productTableBody">
-                            <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    No products yet. Add one to get started!
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+        <!-- Product Grid -->
+        <div class="row g-3" id="productGrid">
+            <div class="col-12 text-center py-5 text-muted">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                No products yet. Add one to get started!
             </div>
         </div>
     </div>

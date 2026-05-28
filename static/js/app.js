@@ -23,42 +23,55 @@ async function loadProducts(search = "") {
     updateStats(allProducts);
 }
 
+const PLACEHOLDER_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
+
+function getPlaceholderColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return PLACEHOLDER_COLORS[Math.abs(hash) % PLACEHOLDER_COLORS.length];
+}
+
 function renderProducts(products) {
-    const tbody = document.getElementById("productTableBody");
+    const grid = document.getElementById("productGrid");
     if (products.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center py-5 text-muted">
-                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                    No products found.
-                </td>
-            </tr>`;
+        grid.innerHTML = `
+            <div class="col-12 text-center py-5 text-muted">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                No products found.
+            </div>`;
         return;
     }
 
-    tbody.innerHTML = products
-        .map(
-            (p) => `
-        <tr>
-            <td class="fw-semibold">${escapeHtml(p.name)}</td>
-            <td>${p.category ? `<span class="badge bg-secondary">${escapeHtml(p.category)}</span>` : '<span class="text-muted">—</span>'}</td>
-            <td class="fw-semibold text-success">${formatVND(p.price)}</td>
-            <td class="product-description text-muted">${escapeHtml(p.description || "—")}</td>
-            <td class="text-end">
-                <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="showEditModal('${p.id}')" title="Edit">
-                    <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger btn-action" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </td>
-            <td>
-                <button class="btn btn-sm btn-warning" onclick="addToCart('${p.id}')" title="Add to cart">
-                    <i class="bi bi-cart-plus"></i>
-                </button>
-            </td>
-        </tr>`
-        )
+    grid.innerHTML = products
+        .map((p) => {
+            const color = getPlaceholderColor(p.name);
+            const initials = p.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
+            return `
+        <div class="col-xl-3 col-lg-4 col-md-6">
+            <div class="product-card">
+                <div class="product-img" style="background:linear-gradient(135deg, ${color}, ${color}dd)">
+                    <span class="product-initials">${initials}</span>
+                    ${p.category ? `<span class="product-badge">${escapeHtml(p.category)}</span>` : ""}
+                </div>
+                <div class="product-info">
+                    <h6 class="product-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h6>
+                    <p class="product-desc">${escapeHtml(p.description || "No description")}</p>
+                    <div class="product-price">${formatVND(p.price)}</div>
+                </div>
+                <div class="product-actions">
+                    <button class="btn btn-sm btn-outline-primary" onclick="showEditModal('${p.id}')" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning ms-auto" onclick="addToCart('${p.id}')" title="Add to cart">
+                        <i class="bi bi-cart-plus me-1"></i>Add
+                    </button>
+                </div>
+            </div>
+        </div>`;
+        })
         .join("");
 }
 

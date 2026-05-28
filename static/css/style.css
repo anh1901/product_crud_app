@@ -1,45 +1,179 @@
-body {
-    background-color: #f8f9fa;
+:root {
+    --bg-body: #f0f2f5;
+    --bg-card: #ffffff;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.1);
+    --shadow-hover: 0 8px 24px rgba(0,0,0,.12);
+    --radius: 0.75rem;
+    --radius-lg: 1rem;
 }
 
-.table th {
-    font-weight: 600;
-    font-size: 0.85rem;
+body {
+    background-color: var(--bg-body);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Stat Cards */
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.stat-card-primary .stat-icon { background: #e0e7ff; color: #4f46e5; }
+.stat-card-success .stat-icon { background: #d1fae5; color: #059669; }
+.stat-card-info .stat-icon    { background: #cffafe; color: #0891b2; }
+
+.stat-label {
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #6c757d;
+    color: #6b7280;
+    font-weight: 600;
 }
 
-.table td {
-    vertical-align: middle;
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1.2;
 }
 
-.card {
-    border-radius: 0.75rem;
+/* Product Cards */
+.product-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: box-shadow 0.25s, transform 0.25s;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
-.btn-action {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
+.product-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-4px);
 }
 
-.toast {
-    min-width: 250px;
+.product-img {
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
 }
 
-.product-description {
-    max-width: 250px;
+.product-initials {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: rgba(255,255,255,.85);
+    letter-spacing: 0.05em;
+    text-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+.product-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,.5);
+    color: #fff;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.product-info {
+    padding: 1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+    color: #1f2937;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.navbar-brand {
-    font-size: 1.25rem;
+.product-desc {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin-bottom: 0.5rem;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
+.product-price {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #059669;
+}
+
+.product-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #f3f4f6;
+    background: #fafbfc;
+}
+
+/* Navbar */
+.navbar-brand {
+    font-size: 1.15rem;
+}
+
+.navbar .form-control:focus {
+    box-shadow: none;
+    border-color: #6366f1;
+}
+
+/* Toast */
+.toast {
+    min-width: 250px;
+}
+
+/* Misc */
 details summary {
     cursor: pointer;
+}
+
+.card {
+    border-radius: var(--radius);
 }
 
 /* Cart Sidebar */
@@ -133,4 +267,10 @@ details summary {
 
 @media print {
     .no-print { display: none !important; }
+}
+
+@media (max-width: 768px) {
+    .stat-card { padding: 1rem; }
+    .stat-value { font-size: 1.2rem; }
+    .product-img { height: 120px; }
 }
