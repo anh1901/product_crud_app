@@ -20,7 +20,9 @@ async function loadProducts() {
     const res = await fetch(API);
     allProducts = await res.json();
     populateCategoryFilter();
+    populateShopCategoryFilter();
     applyFilters();
+    applyShopFilters();
 }
 
 function populateCategoryFilter() {
@@ -65,8 +67,38 @@ function getPlaceholderColor(name) {
     return PLACEHOLDER_COLORS[Math.abs(hash) % PLACEHOLDER_COLORS.length];
 }
 
-function renderProducts(products) {
-    const grid = document.getElementById("productGrid");
+function renderProductCard(p, mode) {
+    const color = getPlaceholderColor(p.name);
+    const initials = p.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
+    const actions = mode === "shop"
+        ? `<button class="btn btn-sm btn-warning ms-auto" onclick="addToCart('${p.id}')" title="Add to cart">
+               <i class="bi bi-cart-plus me-1"></i>Add
+           </button>`
+        : `<button class="btn btn-sm btn-outline-primary" onclick="showEditModal('${p.id}')" title="Edit">
+               <i class="bi bi-pencil"></i>
+           </button>
+           <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
+               <i class="bi bi-trash"></i>
+           </button>`;
+    return `
+    <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="product-card">
+            <div class="product-img" style="background:linear-gradient(135deg, ${color}, ${color}dd)">
+                <span class="product-initials">${initials}</span>
+                ${p.category ? `<span class="product-badge">${escapeHtml(p.category)}</span>` : ""}
+            </div>
+            <div class="product-info">
+                <h6 class="product-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h6>
+                <p class="product-desc">${escapeHtml(p.description || "No description")}</p>
+                <div class="product-price">${formatVND(p.price)}</div>
+            </div>
+            <div class="product-actions">${actions}</div>
+        </div>
+    </div>`;
+}
+
+function renderProductGrid(gridId, products, mode) {
+    const grid = document.getElementById(gridId);
     if (products.length === 0) {
         grid.innerHTML = `
             <div class="col-12 text-center py-5 text-muted">
@@ -75,38 +107,35 @@ function renderProducts(products) {
             </div>`;
         return;
     }
+    grid.innerHTML = products.map(p => renderProductCard(p, mode)).join("");
+}
 
-    grid.innerHTML = products
-        .map((p) => {
-            const color = getPlaceholderColor(p.name);
-            const initials = p.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
-            return `
-        <div class="col-xl-3 col-lg-4 col-md-6">
-            <div class="product-card">
-                <div class="product-img" style="background:linear-gradient(135deg, ${color}, ${color}dd)">
-                    <span class="product-initials">${initials}</span>
-                    ${p.category ? `<span class="product-badge">${escapeHtml(p.category)}</span>` : ""}
-                </div>
-                <div class="product-info">
-                    <h6 class="product-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h6>
-                    <p class="product-desc">${escapeHtml(p.description || "No description")}</p>
-                    <div class="product-price">${formatVND(p.price)}</div>
-                </div>
-                <div class="product-actions">
-                    <button class="btn btn-sm btn-outline-primary" onclick="showEditModal('${p.id}')" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                    <button class="btn btn-sm btn-warning ms-auto" onclick="addToCart('${p.id}')" title="Add to cart">
-                        <i class="bi bi-cart-plus me-1"></i>Add
-                    </button>
-                </div>
-            </div>
-        </div>`;
-        })
-        .join("");
+function renderProducts(products) {
+    renderProductGrid("productGrid", products, "manage");
+}
+
+function renderShop(products) {
+    renderProductGrid("shopGrid", products, "shop");
+}
+
+function applyShopFilters() {
+    const search = document.getElementById("shopSearch").value.trim().toLowerCase();
+    const category = document.getElementById("shopCategoryFilter").value;
+    let filtered = allProducts.filter(p => {
+        if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search)) return false;
+        if (category && p.category !== category) return false;
+        return true;
+    });
+    renderShop(filtered);
+}
+
+function populateShopCategoryFilter() {
+    const select = document.getElementById("shopCategoryFilter");
+    if (!select) return;
+    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+    const current = select.value;
+    select.innerHTML = '<option value="">All Categories</option>' +
+        categories.map(c => `<option value="${c}"${c === current ? " selected" : ""}>${c}</option>`).join("");
 }
 
 function updateStats(products) {}
@@ -453,12 +482,16 @@ async function submitDeal() {
 }
 
 function toggleView(view) {
-    const views = ["productsView", "customersView", "dealsView"];
-    const tabs = ["tabProducts", "tabCustomers", "tabDeals"];
+    const views = ["productsView", "shopView", "customersView", "dealsView"];
+    const tabs = ["tabProducts", "tabShop", "tabCustomers", "tabDeals"];
     views.forEach(v => document.getElementById(v).style.display = "none");
     tabs.forEach(t => document.getElementById(t).classList.remove("active"));
 
-    if (view === "deals") {
+    if (view === "shop") {
+        document.getElementById("shopView").style.display = "block";
+        document.getElementById("tabShop").classList.add("active");
+        applyShopFilters();
+    } else if (view === "deals") {
         document.getElementById("dealsView").style.display = "block";
         document.getElementById("tabDeals").classList.add("active");
         loadDeals();

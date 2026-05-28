@@ -18,6 +18,9 @@
                 <button class="btn btn-sm nav-tab-btn active" id="tabProducts" onclick="toggleView('products')">
                     <i class="bi bi-box-seam me-1"></i>Products
                 </button>
+                <button class="btn btn-sm nav-tab-btn" id="tabShop" onclick="toggleView('shop')">
+                    <i class="bi bi-shop me-1"></i>Shop
+                </button>
                 <button class="btn btn-sm nav-tab-btn" id="tabCustomers" onclick="toggleView('customers')">
                     <i class="bi bi-people me-1"></i>Customers
                 </button>
@@ -83,6 +86,30 @@
                 No products yet. Add one to get started!
             </div>
         </div>
+        </div>
+
+        <!-- Shop View -->
+        <div id="shopView" style="display:none">
+            <div class="filter-bar mb-4">
+                <div class="row g-2 align-items-end">
+                    <div class="col-lg-6 col-md-6">
+                        <label class="filter-label"><i class="bi bi-search me-1"></i>Search Products</label>
+                        <input type="text" class="form-control" id="shopSearch" placeholder="Type product name or category..." oninput="applyShopFilters()">
+                    </div>
+                    <div class="col-lg-4 col-md-4">
+                        <label class="filter-label"><i class="bi bi-tag me-1"></i>Category</label>
+                        <select class="form-select" id="shopCategoryFilter" onchange="applyShopFilters()">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-2">
+                        <button class="btn btn-outline-secondary w-100" onclick="document.getElementById('shopSearch').value='';document.getElementById('shopCategoryFilter').value='';applyShopFilters()" title="Clear">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3" id="shopGrid"></div>
         </div>
 
         <!-- Customers View -->
