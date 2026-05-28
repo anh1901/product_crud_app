@@ -101,10 +101,13 @@
         <div id="dealsView" style="display:none">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="mb-0"><i class="bi bi-clipboard2-check me-2"></i>Deals</h4>
-                <select class="form-select form-select-sm" id="dealStatusFilter" onchange="loadDeals()" style="width:150px">
+                <select class="form-select form-select-sm" id="dealStatusFilter" onchange="loadDeals()" style="width:160px">
                     <option value="">All Status</option>
                     <option value="pending">Pending</option>
-                    <option value="completed">Completed</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="returning">Returning</option>
+                    <option value="done">Done</option>
+                    <option value="fail">Fail</option>
                 </select>
             </div>
             <div id="dealsList"></div>

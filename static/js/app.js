@@ -508,7 +508,7 @@ function renderCustomers(customers) {
                 <th>Phone</th>
                 <th>Address</th>
                 <th class="text-center">Deals</th>
-                <th class="text-center">Pending</th>
+                <th class="text-center">Active</th>
                 <th class="text-end">Total Spent</th>
                 <th>Last Deal</th>
             </tr>
@@ -520,7 +520,7 @@ function renderCustomers(customers) {
                 <td>${c.customer_phone ? escapeHtml(c.customer_phone) : '<span class="text-muted">—</span>'}</td>
                 <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.customer_address ? escapeHtml(c.customer_address) : '—'}</td>
                 <td class="text-center"><span class="badge bg-primary">${c.deal_count}</span></td>
-                <td class="text-center">${c.pending_deals > 0 ? `<span class="badge bg-warning text-dark">${c.pending_deals}</span>` : '<span class="text-muted">0</span>'}</td>
+                <td class="text-center">${c.active_deals > 0 ? `<span class="badge bg-warning text-dark">${c.active_deals}</span>` : '<span class="text-muted">0</span>'}</td>
                 <td class="text-end fw-semibold text-success">${formatVND(c.total_spent)}</td>
                 <td class="text-muted small">${date}</td>
             </tr>`;
@@ -556,6 +556,18 @@ async function loadPendingCount() {
     }
 }
 
+const STATUS_BADGE = {
+    pending: "bg-warning text-dark",
+    ongoing: "bg-primary",
+    returning: "bg-info text-dark",
+    done: "bg-success",
+    fail: "bg-danger"
+};
+
+function statusBadge(status) {
+    return STATUS_BADGE[status] || "bg-secondary";
+}
+
 function renderDeals(deals) {
     const container = document.getElementById("dealsList");
     if (deals.length === 0) {
@@ -565,7 +577,6 @@ function renderDeals(deals) {
     }
 
     container.innerHTML = deals.map(d => {
-        const statusClass = d.status === "completed" ? "bg-success" : "bg-warning text-dark";
         const date = new Date(d.created_at).toLocaleDateString("vi-VN");
         const itemNames = d.items.map(i => i.product_name).join(", ");
         return `
@@ -577,7 +588,7 @@ function renderDeals(deals) {
                     <p class="mb-0 small text-muted mt-1" style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(itemNames)}</p>
                 </div>
                 <div class="text-end">
-                    <span class="badge ${statusClass} mb-1">${d.status.toUpperCase()}</span>
+                    <span class="badge ${statusBadge(d.status)} mb-1">${d.status.toUpperCase()}</span>
                     <div class="fw-bold text-success">${formatVND(d.total)}</div>
                     <small class="text-muted">${d.items.length} item(s)</small>
                 </div>
@@ -594,7 +605,6 @@ async function showDealDetail(dealId) {
     const deal = allDeals.find(d => d.id === dealId);
     if (!deal) return;
 
-    const statusClass = deal.status === "completed" ? "bg-success" : "bg-warning text-dark";
     const date = new Date(deal.created_at).toLocaleDateString("vi-VN", { year: "numeric", month: "long", day: "numeric" });
 
     const rows = deal.items.map(i => `<tr>
@@ -614,7 +624,7 @@ async function showDealDetail(dealId) {
                 ${deal.notes ? `<p class="mb-0 text-muted"><i class="bi bi-sticky me-1"></i>${escapeHtml(deal.notes)}</p>` : ""}
             </div>
             <div class="col-md-6 text-md-end">
-                <span class="badge ${statusClass} fs-6 mb-2">${deal.status.toUpperCase()}</span>
+                <span class="badge ${statusBadge(deal.status)} fs-6 mb-2">${deal.status.toUpperCase()}</span>
                 <p class="text-muted mb-0">${date}</p>
             </div>
         </div>
@@ -650,41 +660,32 @@ async function showDealDetail(dealId) {
             </div>
         </div>`;
 
+    const statuses = ["pending", "ongoing", "returning", "done", "fail"];
+    const statusOptions = statuses.map(s =>
+        `<option value="${s}" ${s === deal.status ? "selected" : ""}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
+    ).join("");
+
     const footer = document.getElementById("dealDetailFooter");
-    if (deal.status === "pending") {
-        footer.innerHTML = `
-            <button class="btn btn-danger" onclick="deleteDeal('${deal.id}')"><i class="bi bi-trash me-1"></i>Delete</button>
-            <button class="btn btn-success" onclick="completeDeal('${deal.id}')"><i class="bi bi-check-circle me-1"></i>Mark Completed</button>`;
-    } else {
-        footer.innerHTML = `
-            <button class="btn btn-danger" onclick="deleteDeal('${deal.id}')"><i class="bi bi-trash me-1"></i>Delete</button>
-            <button class="btn btn-warning" onclick="reopenDeal('${deal.id}')"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>`;
-    }
+    footer.innerHTML = `
+        <button class="btn btn-danger me-auto" onclick="deleteDeal('${deal.id}')"><i class="bi bi-trash me-1"></i>Delete</button>
+        <div class="input-group" style="width:220px">
+            <label class="input-group-text">Status</label>
+            <select class="form-select" id="dealStatusSelect" onchange="updateDealStatus('${deal.id}', this.value)">
+                ${statusOptions}
+            </select>
+        </div>`;
 
     new bootstrap.Modal(document.getElementById("dealDetailModal")).show();
 }
 
-async function completeDeal(dealId) {
+async function updateDealStatus(dealId, newStatus) {
     await fetch(`/api/deals/${dealId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "completed" })
+        body: JSON.stringify({ status: newStatus })
     });
     bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
-    showToast("Deal marked as completed!", "success");
-    loadDeals();
-    loadPendingCount();
-}
-
-async function reopenDeal(dealId) {
-    await fetch(`/api/deals/${dealId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "pending" })
-    });
-    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
-    showToast("Deal reopened", "success");
+    showToast(`Deal status: ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`, "success");
     loadDeals();
     loadPendingCount();
 }

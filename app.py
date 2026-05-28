@@ -340,8 +340,8 @@ def list_customers():
         """SELECT customer_name, customer_phone, customer_address,
            COUNT(*) as deal_count,
            SUM(total) as total_spent,
-           SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending_deals,
-           SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed_deals,
+           SUM(CASE WHEN status IN ('pending','ongoing','returning') THEN 1 ELSE 0 END) as active_deals,
+           SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) as completed_deals,
            MAX(created_at) as last_deal_date
            FROM deals
            GROUP BY LOWER(customer_name)
@@ -423,8 +423,8 @@ def create_deal():
 def update_deal_status(deal_id):
     data = request.get_json()
     new_status = data.get("status", "").strip().lower() if data else ""
-    if new_status not in ("pending", "completed"):
-        return jsonify({"error": "Status must be 'pending' or 'completed'"}), 400
+    if new_status not in ("pending", "ongoing", "returning", "done", "fail"):
+        return jsonify({"error": "Status must be one of: pending, ongoing, returning, done, fail"}), 400
 
     conn = get_db()
     existing = conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,)).fetchone()
