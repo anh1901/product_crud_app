@@ -297,6 +297,13 @@ Coffee Mug,12.50,Ceramic 350ml,Kitchen</pre>
                 <span class="text-danger">Discount:</span>
                 <span id="cartDiscount" class="text-danger fw-semibold">-0₫</span>
             </div>
+            <div class="mb-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-truck"></i></span>
+                    <input type="number" class="form-control" id="shippingInput" min="0" step="1000" value="0" placeholder="Shipping fee" oninput="renderCart()">
+                    <span class="input-group-text">shipping</span>
+                </div>
+            </div>
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="fs-5 fw-bold">Total:</span>
                 <span class="fs-5 fw-bold text-success" id="cartTotal">0₫</span>

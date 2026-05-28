@@ -348,6 +348,7 @@ function setCartQty(productId, value) {
 function clearCart() {
     cart = [];
     document.getElementById("discountInput").value = 0;
+    document.getElementById("shippingInput").value = 0;
     renderCart();
     showToast("Cart cleared", "success");
 }
@@ -367,7 +368,8 @@ function showDealSummary() {
         </tr>`;
     }).join("");
     const discountAmt = subtotal * (discountPct / 100);
-    const finalTotal = subtotal - discountAmt;
+    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
+    const finalTotal = subtotal - discountAmt + shippingFee;
     const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
     document.getElementById("dealSummaryBody").innerHTML = `
@@ -394,6 +396,10 @@ function showDealSummary() {
                     ${discountPct > 0 ? `<tr>
                         <td colspan="3" class="text-end text-danger">Discount (${discountPct}%)</td>
                         <td class="text-end text-danger">-${formatVND(discountAmt)}</td>
+                    </tr>` : ""}
+                    ${shippingFee > 0 ? `<tr>
+                        <td colspan="3" class="text-end"><i class="bi bi-truck me-1"></i>Shipping</td>
+                        <td class="text-end">${formatVND(shippingFee)}</td>
                     </tr>` : ""}
                     <tr class="table-primary">
                         <td colspan="3" class="text-end fs-5 fw-bold">Grand Total</td>
@@ -427,14 +433,16 @@ function showCheckoutModal() {
     document.getElementById("checkoutNotes").value = "";
 
     const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
     let subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const discountAmt = subtotal * (discountPct / 100);
-    const total = subtotal - discountAmt;
+    const total = subtotal - discountAmt + shippingFee;
     const itemCount = cart.reduce((s, i) => s + i.qty, 0);
 
     document.getElementById("checkoutSummary").innerHTML =
         `<strong>${itemCount} item(s)</strong> | Subtotal: ${formatVND(subtotal)}` +
         (discountPct > 0 ? ` | Discount: ${discountPct}% (-${formatVND(discountAmt)})` : "") +
+        (shippingFee > 0 ? ` | Shipping: ${formatVND(shippingFee)}` : "") +
         ` | <strong>Total: ${formatVND(total)}</strong>`;
 
     toggleCart();
@@ -449,6 +457,7 @@ async function submitDeal() {
     }
 
     const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
     const items = cart.map(i => ({
         name: i.name, unit_price: i.price, cost_price: i.cost_price || 0, qty: i.qty
     }));
@@ -459,6 +468,7 @@ async function submitDeal() {
         customer_address: document.getElementById("checkoutAddress").value.trim(),
         notes: document.getElementById("checkoutNotes").value.trim(),
         discount_pct: discountPct,
+        shipping_fee: shippingFee,
         items: items
     };
 
@@ -477,6 +487,7 @@ async function submitDeal() {
     bootstrap.Modal.getInstance(document.getElementById("checkoutModal")).hide();
     cart = [];
     document.getElementById("discountInput").value = 0;
+    document.getElementById("shippingInput").value = 0;
     renderCart();
     showToast("Deal created! Status: Pending", "success");
     loadPendingCount();
@@ -747,6 +758,10 @@ async function showDealDetail(dealId) {
                     <td colspan="3" class="text-end text-danger">Discount (${deal.discount_pct}%)</td>
                     <td class="text-end text-danger">-${formatVND(deal.discount_amt)}</td>
                 </tr>` : ""}
+                ${(deal.shipping_fee || 0) > 0 ? `<tr>
+                    <td colspan="3" class="text-end"><i class="bi bi-truck me-1"></i>Shipping</td>
+                    <td class="text-end">${formatVND(deal.shipping_fee)}</td>
+                </tr>` : ""}
                 <tr class="table-primary">
                     <td colspan="3" class="text-end fs-5 fw-bold">Total</td>
                     <td class="text-end fs-5 fw-bold">${formatVND(deal.total)}</td>
@@ -848,8 +863,9 @@ function renderCart() {
 
     const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
     const discountAmt = subtotalSum * (discountPct / 100);
-    const finalTotal = subtotalSum - discountAmt;
-    const profit = finalTotal - costSum;
+    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
+    const finalTotal = subtotalSum - discountAmt + shippingFee;
+    const profit = finalTotal - costSum - shippingFee;
     const margin = finalTotal > 0 ? (profit / finalTotal) * 100 : 0;
 
     document.getElementById("cartItemCount").textContent = totalItems;

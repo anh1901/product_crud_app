@@ -72,6 +72,11 @@ def init_db():
         )
     """
     )
+    # Migrate: add shipping_fee column if missing
+    deal_cols = [row[1] for row in conn.execute("PRAGMA table_info(deals)").fetchall()]
+    if "shipping_fee" not in deal_cols:
+        conn.execute("ALTER TABLE deals ADD COLUMN shipping_fee REAL DEFAULT 0")
+
     conn.commit()
     conn.close()
 
@@ -436,9 +441,10 @@ def create_deal():
     subtotal = sum(item["unit_price"] * item["qty"] for item in items)
     discount_pct = float(data.get("discount_pct", 0))
     discount_amt = subtotal * (discount_pct / 100)
-    total = subtotal - discount_amt
+    shipping_fee = max(float(data.get("shipping_fee", 0)), 0)
+    total = subtotal - discount_amt + shipping_fee
     cost_total = sum((item.get("cost_price", 0) or 0) * item["qty"] for item in items)
-    profit = total - cost_total
+    profit = total - cost_total - shipping_fee
 
     deal_id = str(uuid.uuid4())
     ts = now_iso()
@@ -446,11 +452,11 @@ def create_deal():
     conn = get_db()
     conn.execute(
         """INSERT INTO deals (id, customer_name, customer_phone, customer_address, notes,
-           subtotal, discount_pct, discount_amt, total, cost_total, profit, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)""",
+           subtotal, discount_pct, discount_amt, shipping_fee, total, cost_total, profit, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)""",
         (deal_id, data["customer_name"].strip(), data.get("customer_phone", "").strip(),
          data.get("customer_address", "").strip(), data.get("notes", "").strip(),
-         subtotal, discount_pct, discount_amt, total, cost_total, profit, ts, ts),
+         subtotal, discount_pct, discount_amt, shipping_fee, total, cost_total, profit, ts, ts),
     )
     for item in items:
         line_total = item["unit_price"] * item["qty"]
