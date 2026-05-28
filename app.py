@@ -72,6 +72,33 @@ def init_db():
         )
     """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS combos (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            combo_price REAL NOT NULL,
+            cost_total REAL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS combo_items (
+            id TEXT PRIMARY KEY,
+            combo_id TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            unit_price REAL NOT NULL,
+            cost_price REAL DEFAULT 0,
+            qty INTEGER NOT NULL,
+            FOREIGN KEY (combo_id) REFERENCES combos(id)
+        )
+    """
+    )
     # Migrate: add shipping_fee column if missing
     deal_cols = [row[1] for row in conn.execute("PRAGMA table_info(deals)").fetchall()]
     if "shipping_fee" not in deal_cols:
@@ -336,6 +363,109 @@ def import_products():
             "products": imported,
         }
     ), 201 if imported else 400
+
+
+# --- Combos ---
+
+@app.route("/api/combos", methods=["GET"])
+def list_combos():
+    conn = get_db()
+    combos = conn.execute("SELECT * FROM combos ORDER BY created_at DESC").fetchall()
+    result = []
+    for combo in combos:
+        c = row_to_dict(combo)
+        items = conn.execute("SELECT * FROM combo_items WHERE combo_id = ?", (c["id"],)).fetchall()
+        c["items"] = [row_to_dict(i) for i in items]
+        original_price = sum(i["unit_price"] * i["qty"] for i in c["items"])
+        c["original_price"] = original_price
+        result.append(c)
+    conn.close()
+    return jsonify(result)
+
+
+@app.route("/api/combos", methods=["POST"])
+def create_combo():
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "Combo name is required"}), 400
+    items = data.get("items", [])
+    if len(items) < 2:
+        return jsonify({"error": "A combo needs at least 2 products"}), 400
+    combo_price = float(data.get("combo_price", 0))
+    if combo_price <= 0:
+        return jsonify({"error": "Combo price must be greater than 0"}), 400
+
+    cost_total = sum((item.get("cost_price", 0) or 0) * item.get("qty", 1) for item in items)
+    combo_id = str(uuid.uuid4())
+    ts = now_iso()
+
+    conn = get_db()
+    conn.execute(
+        """INSERT INTO combos (id, name, description, combo_price, cost_total, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (combo_id, data["name"].strip(), data.get("description", "").strip(),
+         combo_price, cost_total, ts, ts),
+    )
+    for item in items:
+        conn.execute(
+            """INSERT INTO combo_items (id, combo_id, product_id, product_name, unit_price, cost_price, qty)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (str(uuid.uuid4()), combo_id, item["product_id"], item["product_name"],
+             item["unit_price"], item.get("cost_price", 0) or 0, item.get("qty", 1)),
+        )
+    conn.commit()
+    combo = row_to_dict(conn.execute("SELECT * FROM combos WHERE id = ?", (combo_id,)).fetchone())
+    combo["items"] = [row_to_dict(i) for i in conn.execute("SELECT * FROM combo_items WHERE combo_id = ?", (combo_id,)).fetchall()]
+    combo["original_price"] = sum(i["unit_price"] * i["qty"] for i in combo["items"])
+    conn.close()
+    return jsonify(combo), 201
+
+
+@app.route("/api/combos/<combo_id>", methods=["PUT"])
+def update_combo(combo_id):
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "Combo name is required"}), 400
+    items = data.get("items", [])
+    if len(items) < 2:
+        return jsonify({"error": "A combo needs at least 2 products"}), 400
+    combo_price = float(data.get("combo_price", 0))
+    if combo_price <= 0:
+        return jsonify({"error": "Combo price must be greater than 0"}), 400
+
+    cost_total = sum((item.get("cost_price", 0) or 0) * item.get("qty", 1) for item in items)
+    ts = now_iso()
+
+    conn = get_db()
+    conn.execute(
+        """UPDATE combos SET name = ?, description = ?, combo_price = ?, cost_total = ?, updated_at = ?
+           WHERE id = ?""",
+        (data["name"].strip(), data.get("description", "").strip(), combo_price, cost_total, ts, combo_id),
+    )
+    conn.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo_id,))
+    for item in items:
+        conn.execute(
+            """INSERT INTO combo_items (id, combo_id, product_id, product_name, unit_price, cost_price, qty)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (str(uuid.uuid4()), combo_id, item["product_id"], item["product_name"],
+             item["unit_price"], item.get("cost_price", 0) or 0, item.get("qty", 1)),
+        )
+    conn.commit()
+    combo = row_to_dict(conn.execute("SELECT * FROM combos WHERE id = ?", (combo_id,)).fetchone())
+    combo["items"] = [row_to_dict(i) for i in conn.execute("SELECT * FROM combo_items WHERE combo_id = ?", (combo_id,)).fetchall()]
+    combo["original_price"] = sum(i["unit_price"] * i["qty"] for i in combo["items"])
+    conn.close()
+    return jsonify(combo)
+
+
+@app.route("/api/combos/<combo_id>", methods=["DELETE"])
+def delete_combo(combo_id):
+    conn = get_db()
+    conn.execute("DELETE FROM combo_items WHERE combo_id = ?", (combo_id,))
+    conn.execute("DELETE FROM combos WHERE id = ?", (combo_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Combo deleted"})
 
 
 @app.route("/api/customers", methods=["GET"])

@@ -22,6 +22,8 @@ async function loadProducts() {
     populateCategoryFilter();
     populateShopCategoryFilter();
     applyFilters();
+    const comboRes = await fetch("/api/combos");
+    allCombos = await comboRes.json();
     applyShopFilters();
 }
 
@@ -119,6 +121,34 @@ function renderShop(products) {
     renderProductGrid("shopGrid", products, "shop");
 }
 
+function renderComboCard(c) {
+    const saving = c.original_price - c.combo_price;
+    const savePct = c.original_price > 0 ? ((saving / c.original_price) * 100).toFixed(0) : 0;
+    const productList = c.items.map(i => `${i.product_name} ×${i.qty}`).join(", ");
+    return `
+    <div class="col-xl-3 col-lg-4 col-md-6">
+        <div class="product-card">
+            <div class="product-img" style="background:linear-gradient(135deg, #f59e0b, #ef4444dd)">
+                <span class="product-initials"><i class="bi bi-collection"></i></span>
+                <span class="product-badge bg-danger">-${savePct}% COMBO</span>
+            </div>
+            <div class="product-info">
+                <h6 class="product-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</h6>
+                <p class="product-desc">${escapeHtml(productList)}</p>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="product-price">${formatVND(c.combo_price)}</div>
+                    <small class="text-muted text-decoration-line-through">${formatVND(c.original_price)}</small>
+                </div>
+            </div>
+            <div class="product-actions">
+                <button class="btn btn-sm btn-warning ms-auto" onclick="addComboToCart('${c.id}')" title="Add combo to cart">
+                    <i class="bi bi-cart-plus me-1"></i>Add Combo
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
 function applyShopFilters() {
     const search = document.getElementById("shopSearch").value.trim().toLowerCase();
     const category = document.getElementById("shopCategoryFilter").value;
@@ -127,7 +157,31 @@ function applyShopFilters() {
         if (category && p.category !== category) return false;
         return true;
     });
-    renderShop(filtered);
+
+    let comboHtml = "";
+    if (allCombos.length > 0) {
+        let filteredCombos = allCombos;
+        if (search) {
+            filteredCombos = allCombos.filter(c =>
+                c.name.toLowerCase().includes(search) ||
+                c.items.some(i => i.product_name.toLowerCase().includes(search))
+            );
+        }
+        if (filteredCombos.length > 0) {
+            comboHtml = `<div class="col-12"><h5 class="mb-3"><i class="bi bi-collection me-2"></i>Combos</h5></div>` +
+                filteredCombos.map(c => renderComboCard(c)).join("") +
+                `<div class="col-12"><hr><h5 class="mb-3"><i class="bi bi-box-seam me-2"></i>Products</h5></div>`;
+        }
+    }
+
+    const grid = document.getElementById("shopGrid");
+    if (filtered.length === 0 && !comboHtml) {
+        grid.innerHTML = `<div class="col-12 text-center py-5 text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-2"></i>No products found.</div>`;
+        return;
+    }
+
+    grid.innerHTML = comboHtml + filtered.map(p => renderProductCard(p, "shop")).join("");
 }
 
 function populateShopCategoryFilter() {
@@ -319,6 +373,26 @@ function addToCart(productId) {
     showToast(`${product.name} added to cart`, "success");
 }
 
+function addComboToCart(comboId) {
+    const combo = allCombos.find(c => c.id === comboId);
+    if (!combo) return;
+    const cartId = `combo_${comboId}`;
+    const existing = cart.find(item => item.id === cartId);
+    if (existing) {
+        existing.qty += 1;
+    } else {
+        cart.push({
+            id: cartId,
+            name: `[COMBO] ${combo.name}`,
+            price: combo.combo_price,
+            cost_price: combo.cost_total || 0,
+            qty: 1
+        });
+    }
+    renderCart();
+    showToast(`Combo "${combo.name}" added to cart`, "success");
+}
+
 function removeFromCart(productId) {
     cart = cart.filter((item) => item.id !== productId);
     renderCart();
@@ -494,8 +568,8 @@ async function submitDeal() {
 }
 
 function toggleView(view) {
-    const views = ["productsView", "shopView", "customersView", "dealsView"];
-    const tabs = ["tabProducts", "tabShop", "tabCustomers", "tabDeals"];
+    const views = ["productsView", "shopView", "combosView", "customersView", "dealsView"];
+    const tabs = ["tabProducts", "tabShop", "tabCombos", "tabCustomers", "tabDeals"];
     views.forEach(v => document.getElementById(v).style.display = "none");
     tabs.forEach(t => document.getElementById(t).classList.remove("active"));
 
@@ -503,6 +577,10 @@ function toggleView(view) {
         document.getElementById("productsView").style.display = "block";
         document.getElementById("tabProducts").classList.add("active");
         applyFilters();
+    } else if (view === "combos") {
+        document.getElementById("combosView").style.display = "block";
+        document.getElementById("tabCombos").classList.add("active");
+        loadCombos();
     } else if (view === "deals") {
         document.getElementById("dealsView").style.display = "block";
         document.getElementById("tabDeals").classList.add("active");
@@ -517,6 +595,171 @@ function toggleView(view) {
         applyShopFilters();
     }
 }
+
+// --- Combos ---
+
+let allCombos = [];
+let comboItems = [];
+
+async function loadCombos() {
+    const res = await fetch("/api/combos");
+    allCombos = await res.json();
+    renderCombos();
+}
+
+function renderCombos() {
+    const tbody = document.getElementById("comboTableBody");
+    if (allCombos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
+            <i class="bi bi-collection fs-3 d-block mb-2"></i>No combos yet. Create one!</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = allCombos.map(c => {
+        const saving = c.original_price - c.combo_price;
+        const savePct = c.original_price > 0 ? ((saving / c.original_price) * 100).toFixed(0) : 0;
+        const productList = c.items.map(i => `${i.product_name} ×${i.qty}`).join(", ");
+        return `<tr>
+            <td class="fw-bold">${escapeHtml(c.name)}</td>
+            <td class="small text-muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(productList)}</td>
+            <td class="text-end text-muted text-decoration-line-through">${formatVND(c.original_price)}</td>
+            <td class="text-end fw-semibold text-success">${formatVND(c.combo_price)}</td>
+            <td class="text-end"><span class="badge bg-danger">-${savePct}%</span> ${formatVND(saving)}</td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCombo('${c.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteCombo('${c.id}')" title="Delete"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+function showComboModal(comboId = null) {
+    document.getElementById("comboModalTitle").textContent = comboId ? "Edit Combo" : "Create Combo";
+    document.getElementById("comboId").value = comboId || "";
+    document.getElementById("comboName").value = "";
+    document.getElementById("comboPrice").value = "";
+    document.getElementById("comboDescription").value = "";
+    comboItems = [];
+
+    const select = document.getElementById("comboProductSelect");
+    select.innerHTML = '<option value="">Select a product...</option>' +
+        allProducts.map(p => `<option value="${p.id}" data-name="${escapeHtml(p.name)}" data-price="${p.price}" data-cost="${p.cost_price || 0}">${escapeHtml(p.name)} — ${formatVND(p.price)}</option>`).join("");
+
+    if (comboId) {
+        const combo = allCombos.find(c => c.id === comboId);
+        if (combo) {
+            document.getElementById("comboName").value = combo.name;
+            document.getElementById("comboPrice").value = combo.combo_price;
+            document.getElementById("comboDescription").value = combo.description || "";
+            comboItems = combo.items.map(i => ({
+                product_id: i.product_id,
+                product_name: i.product_name,
+                unit_price: i.unit_price,
+                cost_price: i.cost_price || 0,
+                qty: i.qty
+            }));
+        }
+    }
+
+    renderComboItems();
+    new bootstrap.Modal(document.getElementById("comboModal")).show();
+}
+
+function editCombo(comboId) {
+    showComboModal(comboId);
+}
+
+function addComboItem() {
+    const select = document.getElementById("comboProductSelect");
+    const opt = select.options[select.selectedIndex];
+    if (!select.value) return;
+
+    const qty = parseInt(document.getElementById("comboProductQty").value) || 1;
+    const existing = comboItems.find(i => i.product_id === select.value);
+    if (existing) {
+        existing.qty += qty;
+    } else {
+        comboItems.push({
+            product_id: select.value,
+            product_name: opt.dataset.name,
+            unit_price: parseFloat(opt.dataset.price),
+            cost_price: parseFloat(opt.dataset.cost) || 0,
+            qty: qty
+        });
+    }
+
+    select.value = "";
+    document.getElementById("comboProductQty").value = 1;
+    renderComboItems();
+}
+
+function removeComboItem(index) {
+    comboItems.splice(index, 1);
+    renderComboItems();
+}
+
+function renderComboItems() {
+    const tbody = document.getElementById("comboItemsBody");
+    if (comboItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No products added yet</td></tr>`;
+        document.getElementById("comboOriginalTotal").textContent = formatVND(0);
+        return;
+    }
+
+    let total = 0;
+    tbody.innerHTML = comboItems.map((item, idx) => {
+        const lineTotal = item.unit_price * item.qty;
+        total += lineTotal;
+        return `<tr>
+            <td>${escapeHtml(item.product_name)}</td>
+            <td class="text-center">${item.qty}</td>
+            <td class="text-end">${formatVND(item.unit_price)}</td>
+            <td class="text-end">${formatVND(lineTotal)}</td>
+            <td><button class="btn btn-sm btn-outline-danger border-0 p-0" onclick="removeComboItem(${idx})"><i class="bi bi-x-lg"></i></button></td>
+        </tr>`;
+    }).join("");
+    document.getElementById("comboOriginalTotal").textContent = formatVND(total);
+}
+
+async function saveCombo() {
+    const name = document.getElementById("comboName").value.trim();
+    const comboPrice = parseFloat(document.getElementById("comboPrice").value);
+    const description = document.getElementById("comboDescription").value.trim();
+    const comboId = document.getElementById("comboId").value;
+
+    if (!name) { showToast("Combo name is required", "danger"); return; }
+    if (!comboPrice || comboPrice <= 0) { showToast("Set a valid combo price", "danger"); return; }
+    if (comboItems.length < 2) { showToast("Add at least 2 products", "danger"); return; }
+
+    const body = { name, combo_price: comboPrice, description, items: comboItems };
+    const url = comboId ? `/api/combos/${comboId}` : "/api/combos";
+    const method = comboId ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || "Failed to save combo", "danger");
+        return;
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById("comboModal")).hide();
+    showToast(comboId ? "Combo updated" : "Combo created", "success");
+    loadCombos();
+    loadProducts();
+}
+
+async function deleteCombo(comboId) {
+    if (!confirm("Delete this combo?")) return;
+    await fetch(`/api/combos/${comboId}`, { method: "DELETE" });
+    showToast("Combo deleted", "success");
+    loadCombos();
+}
+
+// --- Customers ---
 
 let allCustomers = [];
 
