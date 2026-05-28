@@ -37,13 +37,27 @@ function populateCategoryFilter() {
 
 function applyFilters() {
     const search = document.getElementById("searchInput").value.trim().toLowerCase();
+    const category = document.getElementById("categoryFilter").value;
+    const minPrice = parseFloat(document.getElementById("priceMin").value) || 0;
+    const maxPrice = parseFloat(document.getElementById("priceMax").value) || Infinity;
 
     let filtered = allProducts.filter(p => {
         if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search)) return false;
+        if (category && p.category !== category) return false;
+        if (p.price < minPrice) return false;
+        if (p.price > maxPrice) return false;
         return true;
     });
 
     renderProducts(filtered);
+}
+
+function clearFilters() {
+    document.getElementById("searchInput").value = "";
+    document.getElementById("categoryFilter").value = "";
+    document.getElementById("priceMin").value = "";
+    document.getElementById("priceMax").value = "";
+    applyFilters();
 }
 
 const PLACEHOLDER_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
