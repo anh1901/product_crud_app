@@ -453,23 +453,94 @@ async function submitDeal() {
 }
 
 function toggleView(view) {
-    const productsView = document.getElementById("productsView");
-    const dealsView = document.getElementById("dealsView");
+    const views = ["productsView", "customersView", "dealsView"];
+    const tabs = ["tabProducts", "tabCustomers", "tabDeals"];
+    views.forEach(v => document.getElementById(v).style.display = "none");
+    tabs.forEach(t => document.getElementById(t).classList.remove("active"));
+
     if (view === "deals") {
-        productsView.style.display = "none";
-        dealsView.style.display = "block";
+        document.getElementById("dealsView").style.display = "block";
+        document.getElementById("tabDeals").classList.add("active");
         loadDeals();
+    } else if (view === "customers") {
+        document.getElementById("customersView").style.display = "block";
+        document.getElementById("tabCustomers").classList.add("active");
+        loadCustomers();
     } else {
-        productsView.style.display = "block";
-        dealsView.style.display = "none";
+        document.getElementById("productsView").style.display = "block";
+        document.getElementById("tabProducts").classList.add("active");
     }
 }
 
-async function loadDeals() {
+let allCustomers = [];
+
+async function loadCustomers() {
+    const res = await fetch("/api/customers");
+    allCustomers = await res.json();
+    renderCustomers(allCustomers);
+}
+
+function filterCustomers() {
+    const search = document.getElementById("customerSearch").value.trim().toLowerCase();
+    if (!search) {
+        renderCustomers(allCustomers);
+        return;
+    }
+    const filtered = allCustomers.filter(c =>
+        c.customer_name.toLowerCase().includes(search) ||
+        (c.customer_phone || "").includes(search)
+    );
+    renderCustomers(filtered);
+}
+
+function renderCustomers(customers) {
+    const container = document.getElementById("customersList");
+    if (customers.length === 0) {
+        container.innerHTML = `<div class="text-center text-muted py-5">
+            <i class="bi bi-people fs-1 d-block mb-2"></i>No customers yet. Create a deal to add customers.</div>`;
+        return;
+    }
+
+    container.innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle bg-white rounded shadow-sm">
+        <thead class="table-light">
+            <tr>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th class="text-center">Deals</th>
+                <th class="text-center">Pending</th>
+                <th class="text-end">Total Spent</th>
+                <th>Last Deal</th>
+            </tr>
+        </thead>
+        <tbody>${customers.map(c => {
+            const date = c.last_deal_date ? new Date(c.last_deal_date).toLocaleDateString("vi-VN") : "—";
+            return `<tr style="cursor:pointer" onclick="viewCustomerDeals('${escapeHtml(c.customer_name)}')">
+                <td class="fw-bold">${escapeHtml(c.customer_name)}</td>
+                <td>${c.customer_phone ? escapeHtml(c.customer_phone) : '<span class="text-muted">—</span>'}</td>
+                <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.customer_address ? escapeHtml(c.customer_address) : '—'}</td>
+                <td class="text-center"><span class="badge bg-primary">${c.deal_count}</span></td>
+                <td class="text-center">${c.pending_deals > 0 ? `<span class="badge bg-warning text-dark">${c.pending_deals}</span>` : '<span class="text-muted">0</span>'}</td>
+                <td class="text-end fw-semibold text-success">${formatVND(c.total_spent)}</td>
+                <td class="text-muted small">${date}</td>
+            </tr>`;
+        }).join("")}</tbody></table></div>`;
+}
+
+function viewCustomerDeals(customerName) {
+    toggleView("deals");
+    document.getElementById("dealStatusFilter").value = "";
+    loadDeals(customerName);
+}
+
+async function loadDeals(customerName = null) {
     const status = document.getElementById("dealStatusFilter").value;
     const url = status ? `/api/deals?status=${status}` : "/api/deals";
     const res = await fetch(url);
-    const deals = await res.json();
+    let deals = await res.json();
+    if (customerName) {
+        deals = deals.filter(d => d.customer_name.toLowerCase() === customerName.toLowerCase());
+    }
     renderDeals(deals);
 }
 

@@ -140,6 +140,25 @@ body {
     font-size: 1.15rem;
 }
 
+.nav-tab-btn {
+    color: rgba(255,255,255,.6);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0.3rem 0.75rem;
+    transition: all 0.2s;
+}
+
+.nav-tab-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,.1);
+}
+
+.nav-tab-btn.active {
+    color: #fff;
+    background: rgba(255,255,255,.15);
+    border-color: rgba(255,255,255,.2);
+}
+
 .navbar .form-control:focus {
     box-shadow: none;
     border-color: #6366f1;

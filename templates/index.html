@@ -11,14 +11,21 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container-fluid px-4">
-            <a class="navbar-brand fw-bold" href="#">
-                <i class="bi bi-grid-1x2-fill me-2"></i>Product Dashboard
+            <a class="navbar-brand fw-bold" href="#" onclick="toggleView('products')">
+                <i class="bi bi-grid-1x2-fill me-2"></i>Dashboard
             </a>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-outline-light btn-sm" onclick="toggleView('deals')">
+            <div class="d-flex align-items-center gap-1">
+                <button class="btn btn-sm nav-tab-btn active" id="tabProducts" onclick="toggleView('products')">
+                    <i class="bi bi-box-seam me-1"></i>Products
+                </button>
+                <button class="btn btn-sm nav-tab-btn" id="tabCustomers" onclick="toggleView('customers')">
+                    <i class="bi bi-people me-1"></i>Customers
+                </button>
+                <button class="btn btn-sm nav-tab-btn" id="tabDeals" onclick="toggleView('deals')">
                     <i class="bi bi-clipboard2-check me-1"></i>Deals
                     <span class="badge bg-warning text-dark ms-1" id="pendingCount" style="display:none">0</span>
                 </button>
+                <div class="vr mx-2 bg-secondary"></div>
                 <button class="btn btn-warning btn-sm position-relative" onclick="toggleCart()">
                     <i class="bi bi-cart3 me-1"></i>Cart
                     <span class="badge bg-danger rounded-pill ms-1" id="cartCount">0</span>
@@ -78,20 +85,27 @@
         </div>
         </div>
 
+        <!-- Customers View -->
+        <div id="customersView" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0"><i class="bi bi-people me-2"></i>Customers</h4>
+                <div class="input-group" style="width:250px">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="customerSearch" placeholder="Search customers..." oninput="filterCustomers()">
+                </div>
+            </div>
+            <div id="customersList"></div>
+        </div>
+
         <!-- Deals View -->
         <div id="dealsView" style="display:none">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="mb-0"><i class="bi bi-clipboard2-check me-2"></i>Deals</h4>
-                <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm" id="dealStatusFilter" onchange="loadDeals()" style="width:150px">
-                        <option value="">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="completed">Completed</option>
-                    </select>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="toggleView('products')">
-                        <i class="bi bi-arrow-left me-1"></i>Back to Products
-                    </button>
-                </div>
+                <select class="form-select form-select-sm" id="dealStatusFilter" onchange="loadDeals()" style="width:150px">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                </select>
             </div>
             <div id="dealsList"></div>
         </div>

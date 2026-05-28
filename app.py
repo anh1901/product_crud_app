@@ -333,6 +333,24 @@ def import_products():
     ), 201 if imported else 400
 
 
+@app.route("/api/customers", methods=["GET"])
+def list_customers():
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT customer_name, customer_phone, customer_address,
+           COUNT(*) as deal_count,
+           SUM(total) as total_spent,
+           SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending_deals,
+           SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed_deals,
+           MAX(created_at) as last_deal_date
+           FROM deals
+           GROUP BY LOWER(customer_name)
+           ORDER BY last_deal_date DESC"""
+    ).fetchall()
+    conn.close()
+    return jsonify([row_to_dict(r) for r in rows])
+
+
 @app.route("/api/deals", methods=["GET"])
 def list_deals():
     status = request.args.get("status", "").strip()
