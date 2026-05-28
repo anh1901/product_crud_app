@@ -9,6 +9,7 @@ function formatVND(amount) {
 
 document.addEventListener("DOMContentLoaded", () => {
     loadProducts();
+    loadPendingCount();
     document.getElementById("searchInput").addEventListener("input", () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => applyFilters(), 300);
@@ -384,6 +385,246 @@ function printDealSummary() {
         </head><body>${content}</body></html>`);
     win.document.close();
     win.onload = () => { win.print(); };
+}
+
+// --- Checkout & Deals ---
+
+function showCheckoutModal() {
+    if (cart.length === 0) return;
+    document.getElementById("checkoutName").value = "";
+    document.getElementById("checkoutPhone").value = "";
+    document.getElementById("checkoutAddress").value = "";
+    document.getElementById("checkoutNotes").value = "";
+
+    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    let subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const discountAmt = subtotal * (discountPct / 100);
+    const total = subtotal - discountAmt;
+    const itemCount = cart.reduce((s, i) => s + i.qty, 0);
+
+    document.getElementById("checkoutSummary").innerHTML =
+        `<strong>${itemCount} item(s)</strong> | Subtotal: ${formatVND(subtotal)}` +
+        (discountPct > 0 ? ` | Discount: ${discountPct}% (-${formatVND(discountAmt)})` : "") +
+        ` | <strong>Total: ${formatVND(total)}</strong>`;
+
+    toggleCart();
+    new bootstrap.Modal(document.getElementById("checkoutModal")).show();
+}
+
+async function submitDeal() {
+    const name = document.getElementById("checkoutName").value.trim();
+    if (!name) {
+        showToast("Customer name is required", "danger");
+        return;
+    }
+
+    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    const items = cart.map(i => ({
+        name: i.name, unit_price: i.price, cost_price: i.cost_price || 0, qty: i.qty
+    }));
+
+    const body = {
+        customer_name: name,
+        customer_phone: document.getElementById("checkoutPhone").value.trim(),
+        customer_address: document.getElementById("checkoutAddress").value.trim(),
+        notes: document.getElementById("checkoutNotes").value.trim(),
+        discount_pct: discountPct,
+        items: items
+    };
+
+    const res = await fetch("/api/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || "Failed to create deal", "danger");
+        return;
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById("checkoutModal")).hide();
+    cart = [];
+    document.getElementById("discountInput").value = 0;
+    renderCart();
+    showToast("Deal created! Status: Pending", "success");
+    loadPendingCount();
+}
+
+function toggleView(view) {
+    const productsView = document.getElementById("productsView");
+    const dealsView = document.getElementById("dealsView");
+    if (view === "deals") {
+        productsView.style.display = "none";
+        dealsView.style.display = "block";
+        loadDeals();
+    } else {
+        productsView.style.display = "block";
+        dealsView.style.display = "none";
+    }
+}
+
+async function loadDeals() {
+    const status = document.getElementById("dealStatusFilter").value;
+    const url = status ? `/api/deals?status=${status}` : "/api/deals";
+    const res = await fetch(url);
+    const deals = await res.json();
+    renderDeals(deals);
+}
+
+async function loadPendingCount() {
+    const res = await fetch("/api/deals?status=pending");
+    const deals = await res.json();
+    const badge = document.getElementById("pendingCount");
+    if (deals.length > 0) {
+        badge.textContent = deals.length;
+        badge.style.display = "inline";
+    } else {
+        badge.style.display = "none";
+    }
+}
+
+function renderDeals(deals) {
+    const container = document.getElementById("dealsList");
+    if (deals.length === 0) {
+        container.innerHTML = `<div class="text-center text-muted py-5">
+            <i class="bi bi-clipboard-x fs-1 d-block mb-2"></i>No deals found.</div>`;
+        return;
+    }
+
+    container.innerHTML = deals.map(d => {
+        const statusClass = d.status === "completed" ? "bg-success" : "bg-warning text-dark";
+        const date = new Date(d.created_at).toLocaleDateString("vi-VN");
+        const itemNames = d.items.map(i => i.product_name).join(", ");
+        return `
+        <div class="deal-card mb-3" onclick="showDealDetail('${d.id}')">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h6 class="mb-1 fw-bold">${escapeHtml(d.customer_name)}</h6>
+                    <small class="text-muted">${d.customer_phone ? escapeHtml(d.customer_phone) + " | " : ""}${date}</small>
+                    <p class="mb-0 small text-muted mt-1" style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(itemNames)}</p>
+                </div>
+                <div class="text-end">
+                    <span class="badge ${statusClass} mb-1">${d.status.toUpperCase()}</span>
+                    <div class="fw-bold text-success">${formatVND(d.total)}</div>
+                    <small class="text-muted">${d.items.length} item(s)</small>
+                </div>
+            </div>
+        </div>`;
+    }).join("");
+}
+
+let allDeals = [];
+
+async function showDealDetail(dealId) {
+    const res = await fetch("/api/deals");
+    allDeals = await res.json();
+    const deal = allDeals.find(d => d.id === dealId);
+    if (!deal) return;
+
+    const statusClass = deal.status === "completed" ? "bg-success" : "bg-warning text-dark";
+    const date = new Date(deal.created_at).toLocaleDateString("vi-VN", { year: "numeric", month: "long", day: "numeric" });
+
+    const rows = deal.items.map(i => `<tr>
+        <td>${escapeHtml(i.product_name)}</td>
+        <td class="text-center">${i.qty}</td>
+        <td class="text-end">${formatVND(i.unit_price)}</td>
+        <td class="text-end">${formatVND(i.line_total)}</td>
+    </tr>`).join("");
+
+    document.getElementById("dealDetailBody").innerHTML = `
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <h6 class="text-muted mb-1">Customer</h6>
+                <p class="fw-bold mb-1">${escapeHtml(deal.customer_name)}</p>
+                ${deal.customer_phone ? `<p class="mb-1"><i class="bi bi-telephone me-1"></i>${escapeHtml(deal.customer_phone)}</p>` : ""}
+                ${deal.customer_address ? `<p class="mb-1"><i class="bi bi-geo-alt me-1"></i>${escapeHtml(deal.customer_address)}</p>` : ""}
+                ${deal.notes ? `<p class="mb-0 text-muted"><i class="bi bi-sticky me-1"></i>${escapeHtml(deal.notes)}</p>` : ""}
+            </div>
+            <div class="col-md-6 text-md-end">
+                <span class="badge ${statusClass} fs-6 mb-2">${deal.status.toUpperCase()}</span>
+                <p class="text-muted mb-0">${date}</p>
+            </div>
+        </div>
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>Product</th>
+                    <th class="text-center" style="width:80px">Qty</th>
+                    <th class="text-end" style="width:120px">Unit Price</th>
+                    <th class="text-end" style="width:120px">Total</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="text-end fw-semibold">Subtotal</td>
+                    <td class="text-end fw-semibold">${formatVND(deal.subtotal)}</td>
+                </tr>
+                ${deal.discount_pct > 0 ? `<tr>
+                    <td colspan="3" class="text-end text-danger">Discount (${deal.discount_pct}%)</td>
+                    <td class="text-end text-danger">-${formatVND(deal.discount_amt)}</td>
+                </tr>` : ""}
+                <tr class="table-primary">
+                    <td colspan="3" class="text-end fs-5 fw-bold">Total</td>
+                    <td class="text-end fs-5 fw-bold">${formatVND(deal.total)}</td>
+                </tr>
+            </tfoot>
+        </table>
+        <div class="profit-section p-2 rounded">
+            <div class="d-flex justify-content-between">
+                <span class="small"><i class="bi bi-lock-fill me-1"></i>Profit:</span>
+                <span class="fw-bold ${deal.profit >= 0 ? "text-success" : "text-danger"}">${formatVND(deal.profit)}</span>
+            </div>
+        </div>`;
+
+    const footer = document.getElementById("dealDetailFooter");
+    if (deal.status === "pending") {
+        footer.innerHTML = `
+            <button class="btn btn-danger" onclick="deleteDeal('${deal.id}')"><i class="bi bi-trash me-1"></i>Delete</button>
+            <button class="btn btn-success" onclick="completeDeal('${deal.id}')"><i class="bi bi-check-circle me-1"></i>Mark Completed</button>`;
+    } else {
+        footer.innerHTML = `
+            <button class="btn btn-danger" onclick="deleteDeal('${deal.id}')"><i class="bi bi-trash me-1"></i>Delete</button>
+            <button class="btn btn-warning" onclick="reopenDeal('${deal.id}')"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>`;
+    }
+
+    new bootstrap.Modal(document.getElementById("dealDetailModal")).show();
+}
+
+async function completeDeal(dealId) {
+    await fetch(`/api/deals/${dealId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" })
+    });
+    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
+    showToast("Deal marked as completed!", "success");
+    loadDeals();
+    loadPendingCount();
+}
+
+async function reopenDeal(dealId) {
+    await fetch(`/api/deals/${dealId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "pending" })
+    });
+    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
+    showToast("Deal reopened", "success");
+    loadDeals();
+    loadPendingCount();
+}
+
+async function deleteDeal(dealId) {
+    if (!confirm("Delete this deal?")) return;
+    await fetch(`/api/deals/${dealId}`, { method: "DELETE" });
+    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
+    showToast("Deal deleted", "success");
+    loadDeals();
+    loadPendingCount();
 }
 
 function renderCart() {

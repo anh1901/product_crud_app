@@ -37,6 +37,41 @@ def init_db():
     cols = [row[1] for row in conn.execute("PRAGMA table_info(products)").fetchall()]
     if "cost_price" not in cols:
         conn.execute("ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS deals (
+            id TEXT PRIMARY KEY,
+            customer_name TEXT NOT NULL,
+            customer_phone TEXT DEFAULT '',
+            customer_address TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            subtotal REAL NOT NULL,
+            discount_pct REAL DEFAULT 0,
+            discount_amt REAL DEFAULT 0,
+            total REAL NOT NULL,
+            cost_total REAL DEFAULT 0,
+            profit REAL DEFAULT 0,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS deal_items (
+            id TEXT PRIMARY KEY,
+            deal_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            unit_price REAL NOT NULL,
+            cost_price REAL DEFAULT 0,
+            qty INTEGER NOT NULL,
+            line_total REAL NOT NULL,
+            FOREIGN KEY (deal_id) REFERENCES deals(id)
+        )
+    """
+    )
     conn.commit()
     conn.close()
 
@@ -296,6 +331,112 @@ def import_products():
             "products": imported,
         }
     ), 201 if imported else 400
+
+
+@app.route("/api/deals", methods=["GET"])
+def list_deals():
+    status = request.args.get("status", "").strip()
+    conn = get_db()
+    if status:
+        deals = conn.execute(
+            "SELECT * FROM deals WHERE status = ? ORDER BY created_at DESC", (status,)
+        ).fetchall()
+    else:
+        deals = conn.execute(
+            "SELECT * FROM deals ORDER BY created_at DESC"
+        ).fetchall()
+    result = []
+    for deal in deals:
+        d = row_to_dict(deal)
+        items = conn.execute(
+            "SELECT * FROM deal_items WHERE deal_id = ?", (d["id"],)
+        ).fetchall()
+        d["items"] = [row_to_dict(i) for i in items]
+        result.append(d)
+    conn.close()
+    return jsonify(result)
+
+
+@app.route("/api/deals", methods=["POST"])
+def create_deal():
+    data = request.get_json()
+    if not data or not data.get("customer_name"):
+        return jsonify({"error": "Customer name is required"}), 400
+    items = data.get("items", [])
+    if not items:
+        return jsonify({"error": "At least one item is required"}), 400
+
+    subtotal = sum(item["unit_price"] * item["qty"] for item in items)
+    discount_pct = float(data.get("discount_pct", 0))
+    discount_amt = subtotal * (discount_pct / 100)
+    total = subtotal - discount_amt
+    cost_total = sum((item.get("cost_price", 0) or 0) * item["qty"] for item in items)
+    profit = total - cost_total
+
+    deal_id = str(uuid.uuid4())
+    ts = now_iso()
+
+    conn = get_db()
+    conn.execute(
+        """INSERT INTO deals (id, customer_name, customer_phone, customer_address, notes,
+           subtotal, discount_pct, discount_amt, total, cost_total, profit, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)""",
+        (deal_id, data["customer_name"].strip(), data.get("customer_phone", "").strip(),
+         data.get("customer_address", "").strip(), data.get("notes", "").strip(),
+         subtotal, discount_pct, discount_amt, total, cost_total, profit, ts, ts),
+    )
+    for item in items:
+        line_total = item["unit_price"] * item["qty"]
+        conn.execute(
+            """INSERT INTO deal_items (id, deal_id, product_name, unit_price, cost_price, qty, line_total)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (str(uuid.uuid4()), deal_id, item["name"], item["unit_price"],
+             item.get("cost_price", 0) or 0, item["qty"], line_total),
+        )
+    conn.commit()
+
+    deal = row_to_dict(conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,)).fetchone())
+    deal["items"] = [row_to_dict(i) for i in conn.execute("SELECT * FROM deal_items WHERE deal_id = ?", (deal_id,)).fetchall()]
+    conn.close()
+    return jsonify(deal), 201
+
+
+@app.route("/api/deals/<deal_id>/status", methods=["PUT"])
+def update_deal_status(deal_id):
+    data = request.get_json()
+    new_status = data.get("status", "").strip().lower() if data else ""
+    if new_status not in ("pending", "completed"):
+        return jsonify({"error": "Status must be 'pending' or 'completed'"}), 400
+
+    conn = get_db()
+    existing = conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    if not existing:
+        conn.close()
+        return jsonify({"error": "Deal not found"}), 404
+
+    conn.execute(
+        "UPDATE deals SET status = ?, updated_at = ? WHERE id = ?",
+        (new_status, now_iso(), deal_id),
+    )
+    conn.commit()
+    deal = row_to_dict(conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,)).fetchone())
+    deal["items"] = [row_to_dict(i) for i in conn.execute("SELECT * FROM deal_items WHERE deal_id = ?", (deal_id,)).fetchall()]
+    conn.close()
+    return jsonify(deal)
+
+
+@app.route("/api/deals/<deal_id>", methods=["DELETE"])
+def delete_deal(deal_id):
+    conn = get_db()
+    existing = conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,)).fetchone()
+    if not existing:
+        conn.close()
+        return jsonify({"error": "Deal not found"}), 404
+    conn.execute("DELETE FROM deal_items WHERE deal_id = ?", (deal_id,))
+    conn.execute("DELETE FROM deals WHERE id = ?", (deal_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Deal deleted"})
 
 
 def _parse_csv(content):

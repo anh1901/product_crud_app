@@ -248,6 +248,21 @@ details summary {
     border-color: #ffcdd2;
 }
 
+/* Deal Cards */
+.deal-card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.deal-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
 @media print {
     .no-print { display: none !important; }
 }
