@@ -546,7 +546,7 @@ function renderCustomers(customers) {
                 <th class="text-center">Active</th>
                 <th class="text-end">Total Spent</th>
                 <th>Last Deal</th>
-                <th class="text-center" style="width:140px">Actions</th>
+                <th class="text-center" style="width:180px">Actions</th>
             </tr>
         </thead>
         <tbody>${customers.map(c => {
@@ -561,6 +561,7 @@ function renderCustomers(customers) {
                 <td class="text-end fw-semibold text-success">${formatVND(c.total_spent)}</td>
                 <td class="text-muted small">${date}</td>
                 <td class="text-center">
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="viewCustomerDeals('${nameEsc}')" title="View Deals"><i class="bi bi-clipboard2-check"></i></button>
                     <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditCustomer('${nameEsc}')" title="Edit"><i class="bi bi-pencil"></i></button>
                     <button class="btn btn-sm btn-outline-danger" onclick="showDeleteCustomer('${nameEsc}')" title="Delete"><i class="bi bi-trash"></i></button>
                 </td>
