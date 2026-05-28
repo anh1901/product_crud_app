@@ -1,0 +1,43 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.card {
+    border-radius: 0.75rem;
+}
+
+.btn-action {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.toast {
+    min-width: 250px;
+}
+
+.product-description {
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.navbar-brand {
+    font-size: 1.25rem;
+}
+
+details summary {
+    cursor: pointer;
+}

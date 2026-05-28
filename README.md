@@ -1,62 +1,83 @@
 # Product CRUD App
 
-A simple Flutter mobile app for managing products with full CRUD (Create, Read, Update, Delete) functionality.
+A web application for managing products with full CRUD (Create, Read, Update, Delete) functionality and bulk import via JSON/CSV.
 
 ## Features
 
-- **Create** products with name, price, description, and image
-- **Read** product list and detailed product view
+- **Create** products with name, price, description, and category
+- **Read** product list with search and statistics dashboard
 - **Update** existing product information
 - **Delete** products with confirmation dialog
-- Image picking from camera or gallery
-- Local SQLite database for persistent storage
-- Material 3 design with pull-to-refresh
+- **Bulk Import** products from JSON or CSV files
+- **Paste JSON** directly to import multiple products
+- SQLite database for persistent storage
+- Responsive Bootstrap 5 UI
 
 ## Tech Stack
 
-- **Flutter** 3.44+ / Dart 3.12+
-- **sqflite** — SQLite database for local persistence
-- **image_picker** — Camera and gallery image selection
-- **uuid** — Unique ID generation for products
-- **intl** — Number/currency formatting
+- **Python** 3.10+ / **Flask** 3.x
+- **SQLite** — Database for persistence
+- **Bootstrap 5** — Responsive UI framework
+- **Bootstrap Icons** — Icon set
 
 ## Project Structure
 
 ```
-lib/
-├── main.dart                     # App entry point and theme
-├── models/
-│   └── product.dart              # Product data model
-├── helpers/
-│   └── database_helper.dart      # SQLite database operations
-└── screens/
-    ├── product_list_screen.dart   # Product listing with search
-    ├── product_detail_screen.dart # Product detail view
-    └── product_form_screen.dart   # Add/Edit product form
+├── app.py                        # Flask app with API endpoints
+├── requirements.txt              # Python dependencies
+├── templates/
+│   └── index.html                # Main page template
+└── static/
+    ├── css/
+    │   └── style.css             # Custom styles
+    └── js/
+        └── app.js                # Frontend JavaScript
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Flutter SDK 3.44+
-- Android Studio / Xcode (for emulators)
+- Python 3.10+
+
+### Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
 
 ### Run the app
 
 ```bash
-flutter pub get
-flutter run
+python app.py
 ```
 
-### Run tests
+The app will be available at [http://localhost:5000](http://localhost:5000).
 
-```bash
-flutter test
+## API Endpoints
+
+| Method | Endpoint               | Description            |
+| ------ | ---------------------- | ---------------------- |
+| GET    | `/api/products`        | List all products      |
+| GET    | `/api/products/<id>`   | Get a single product   |
+| POST   | `/api/products`        | Create a product       |
+| PUT    | `/api/products/<id>`   | Update a product       |
+| DELETE | `/api/products/<id>`   | Delete a product       |
+| POST   | `/api/products/import` | Bulk import (JSON/CSV) |
+
+### Bulk Import Formats
+
+**JSON** (POST body or file upload):
+```json
+[
+  {"name": "Laptop", "price": 999.99, "description": "High-performance", "category": "Electronics"},
+  {"name": "Headphones", "price": 49.99, "category": "Electronics"}
+]
 ```
 
-### Analyze
-
-```bash
-flutter analyze
+**CSV** (file upload):
+```csv
+name,price,description,category
+Laptop,999.99,High-performance,Electronics
+Headphones,49.99,,Electronics
 ```
