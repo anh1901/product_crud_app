@@ -109,7 +109,6 @@ function renderProducts(products) {
 }
 
 function updateStats(products) {
-    document.getElementById("statTotal").textContent = products.length;
     const categories = new Set(products.map((p) => p.category).filter(Boolean));
     document.getElementById("statCategories").textContent = categories.size;
     const avg =

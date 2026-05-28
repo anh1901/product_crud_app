@@ -13,52 +13,27 @@ body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-/* Stat Cards */
-.stat-card {
-    display: flex;
+/* Compact Stat Chips */
+.stat-card-sm {
+    display: inline-flex;
     align-items: center;
-    gap: 1rem;
-    padding: 1.25rem;
-    border-radius: var(--radius-lg);
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
     background: var(--bg-card);
     box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.2s, transform 0.2s;
+    color: #374151;
 }
 
-.stat-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
+.stat-card-sm i { font-size: 0.9rem; }
+.stat-card-sm span { font-weight: 700; }
 
-.stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.3rem;
-    flex-shrink: 0;
-}
-
-.stat-card-primary .stat-icon { background: #e0e7ff; color: #4f46e5; }
-.stat-card-success .stat-icon { background: #d1fae5; color: #059669; }
-.stat-card-info .stat-icon    { background: #cffafe; color: #0891b2; }
-
-.stat-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #6b7280;
-    font-weight: 600;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #1f2937;
-    line-height: 1.2;
-}
+.stat-card-success { color: #059669; }
+.stat-card-success i { color: #059669; }
+.stat-card-info { color: #0891b2; }
+.stat-card-info i { color: #0891b2; }
 
 /* Product Cards */
 .product-card {
@@ -300,7 +275,5 @@ details summary {
 }
 
 @media (max-width: 768px) {
-    .stat-card { padding: 1rem; }
-    .stat-value { font-size: 1.2rem; }
     .product-img { height: 120px; }
 }

@@ -23,43 +23,26 @@
 
     <div class="container-fluid px-4 py-4">
         <!-- Stats Row -->
-        <div class="row g-3 mb-4">
-            <div class="col-lg-3 col-md-6">
-                <div class="stat-card stat-card-primary">
-                    <div class="stat-icon"><i class="bi bi-box-seam-fill"></i></div>
-                    <div>
-                        <div class="stat-label">Total Products</div>
-                        <div class="stat-value" id="statTotal">0</div>
-                    </div>
+        <div class="row g-2 mb-3">
+            <div class="col-auto">
+                <div class="stat-card-sm stat-card-success">
+                    <i class="bi bi-tags-fill"></i>
+                    <span id="statCategories">0</span> categories
                 </div>
             </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stat-card stat-card-success">
-                    <div class="stat-icon"><i class="bi bi-tags-fill"></i></div>
-                    <div>
-                        <div class="stat-label">Categories</div>
-                        <div class="stat-value" id="statCategories">0</div>
-                    </div>
+            <div class="col-auto">
+                <div class="stat-card-sm stat-card-info">
+                    <i class="bi bi-cash-stack"></i>
+                    Avg. <span id="statAvgPrice">0₫</span>
                 </div>
             </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stat-card stat-card-info">
-                    <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
-                    <div>
-                        <div class="stat-label">Avg. Price</div>
-                        <div class="stat-value" id="statAvgPrice">0₫</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="d-flex gap-2 h-100 align-items-stretch">
-                    <button class="btn btn-success flex-fill d-flex align-items-center justify-content-center gap-2" onclick="showAddModal()">
-                        <i class="bi bi-plus-circle-fill fs-5"></i>
-                        <span>Add Product</span>
+            <div class="col-auto ms-auto">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success btn-sm d-flex align-items-center gap-1" onclick="showAddModal()">
+                        <i class="bi bi-plus-circle-fill"></i> Add Product
                     </button>
-                    <button class="btn btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-2" onclick="showImportModal()">
-                        <i class="bi bi-cloud-upload-fill fs-5"></i>
-                        <span>Import</span>
+                    <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" onclick="showImportModal()">
+                        <i class="bi bi-cloud-upload-fill"></i> Import
                     </button>
                 </div>
             </div>
