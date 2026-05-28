@@ -3,6 +3,10 @@ let allProducts = [];
 let searchTimeout = null;
 let cart = [];
 
+function formatVND(amount) {
+    return Number(amount).toLocaleString("vi-VN") + "₫";
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     loadProducts();
     document.getElementById("searchInput").addEventListener("input", (e) => {
@@ -38,7 +42,7 @@ function renderProducts(products) {
         <tr>
             <td class="fw-semibold">${escapeHtml(p.name)}</td>
             <td>${p.category ? `<span class="badge bg-secondary">${escapeHtml(p.category)}</span>` : '<span class="text-muted">—</span>'}</td>
-            <td class="fw-semibold text-success">$${Number(p.price).toFixed(2)}</td>
+            <td class="fw-semibold text-success">${formatVND(p.price)}</td>
             <td class="product-description text-muted">${escapeHtml(p.description || "—")}</td>
             <td class="text-end">
                 <button class="btn btn-sm btn-outline-primary btn-action me-1" onclick="showEditModal('${p.id}')" title="Edit">
@@ -66,7 +70,7 @@ function updateStats(products) {
         products.length > 0
             ? products.reduce((sum, p) => sum + p.price, 0) / products.length
             : 0;
-    document.getElementById("statAvgPrice").textContent = `$${avg.toFixed(2)}`;
+    document.getElementById("statAvgPrice").textContent = formatVND(avg);
 }
 
 function showAddModal() {
@@ -290,8 +294,8 @@ function showDealSummary() {
         return `<tr>
             <td>${escapeHtml(item.name)}</td>
             <td class="text-center">${item.qty}</td>
-            <td class="text-end">$${Number(item.price).toFixed(2)}</td>
-            <td class="text-end">$${lineTotal.toFixed(2)}</td>
+            <td class="text-end">${formatVND(item.price)}</td>
+            <td class="text-end">${formatVND(lineTotal)}</td>
         </tr>`;
     }).join("");
     const discountAmt = subtotal * (discountPct / 100);
@@ -317,15 +321,15 @@ function showDealSummary() {
                 <tfoot>
                     <tr>
                         <td colspan="3" class="text-end fw-semibold">Subtotal</td>
-                        <td class="text-end fw-semibold">$${subtotal.toFixed(2)}</td>
+                        <td class="text-end fw-semibold">${formatVND(subtotal)}</td>
                     </tr>
                     ${discountPct > 0 ? `<tr>
                         <td colspan="3" class="text-end text-danger">Discount (${discountPct}%)</td>
-                        <td class="text-end text-danger">-$${discountAmt.toFixed(2)}</td>
+                        <td class="text-end text-danger">-${formatVND(discountAmt)}</td>
                     </tr>` : ""}
                     <tr class="table-primary">
                         <td colspan="3" class="text-end fs-5 fw-bold">Grand Total</td>
-                        <td class="text-end fs-5 fw-bold">$${finalTotal.toFixed(2)}</td>
+                        <td class="text-end fs-5 fw-bold">${formatVND(finalTotal)}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -385,9 +389,9 @@ function renderCart() {
                                onchange="setCartQty('${item.id}', this.value)" style="max-width:50px">
                         <button class="btn btn-outline-secondary" onclick="updateCartQty('${item.id}', 1)">+</button>
                     </div>
-                    <span class="text-success fw-semibold">$${subtotal.toFixed(2)}</span>
+                    <span class="text-success fw-semibold">${formatVND(subtotal)}</span>
                 </div>
-                <small class="text-muted">$${Number(item.price).toFixed(2)} each</small>
+                <small class="text-muted">${formatVND(item.price)} each</small>
             </div>`;
         })
         .join("");
@@ -399,19 +403,19 @@ function renderCart() {
     const margin = finalTotal > 0 ? (profit / finalTotal) * 100 : 0;
 
     document.getElementById("cartItemCount").textContent = totalItems;
-    document.getElementById("cartSubtotal").textContent = `$${subtotalSum.toFixed(2)}`;
+    document.getElementById("cartSubtotal").textContent = formatVND(subtotalSum);
 
     const discountRow = document.getElementById("discountRow");
     if (discountPct > 0) {
         discountRow.style.display = "flex";
         discountRow.style.setProperty("display", "flex", "important");
-        document.getElementById("cartDiscount").textContent = `-$${discountAmt.toFixed(2)}`;
+        document.getElementById("cartDiscount").textContent = `-${formatVND(discountAmt)}`;
     } else {
         discountRow.style.setProperty("display", "none", "important");
     }
 
-    document.getElementById("cartTotal").textContent = `$${finalTotal.toFixed(2)}`;
-    document.getElementById("cartProfit").textContent = `$${profit.toFixed(2)}`;
+    document.getElementById("cartTotal").textContent = formatVND(finalTotal);
+    document.getElementById("cartProfit").textContent = formatVND(profit);
     document.getElementById("cartProfit").className = `fw-bold ${profit >= 0 ? "text-success" : "text-danger"}`;
     document.getElementById("cartMargin").textContent = `${margin.toFixed(1)}%`;
     document.getElementById("cartMargin").className = `fw-semibold small ${profit >= 0 ? "text-success" : "text-danger"}`;

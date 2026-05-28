@@ -59,10 +59,19 @@ def list_products():
     search = request.args.get("search", "").strip()
     conn = get_db()
     if search:
-        rows = conn.execute(
-            "SELECT * FROM products WHERE name LIKE ? OR category LIKE ? ORDER BY created_at DESC",
-            (f"%{search}%", f"%{search}%"),
-        ).fetchall()
+        params = [f"%{search}%", f"%{search}%"]
+        query = (
+            "SELECT * FROM products WHERE name LIKE ? OR category LIKE ?"
+        )
+        try:
+            price_val = float(search)
+            margin = price_val * 0.1 if price_val > 0 else 1000
+            query += " OR (price BETWEEN ? AND ?)"
+            params.extend([price_val - margin, price_val + margin])
+        except ValueError:
+            pass
+        query += " ORDER BY created_at DESC"
+        rows = conn.execute(query, params).fetchall()
     else:
         rows = conn.execute(
             "SELECT * FROM products ORDER BY created_at DESC"
