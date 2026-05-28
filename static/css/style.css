@@ -152,6 +152,36 @@ body {
     background: #fafbfc;
 }
 
+/* Filter Bar */
+.filter-bar {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 1.25rem;
+}
+
+.filter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+    margin-bottom: 0.3rem;
+    display: block;
+}
+
+.filter-bar .form-control,
+.filter-bar .form-select {
+    border-color: #e5e7eb;
+    font-size: 0.9rem;
+}
+
+.filter-bar .form-control:focus,
+.filter-bar .form-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+}
+
 /* Navbar */
 .navbar-brand {
     font-size: 1.15rem;

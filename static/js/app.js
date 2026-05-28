@@ -9,18 +9,51 @@ function formatVND(amount) {
 
 document.addEventListener("DOMContentLoaded", () => {
     loadProducts();
-    document.getElementById("searchInput").addEventListener("input", (e) => {
+    document.getElementById("searchInput").addEventListener("input", () => {
         clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => loadProducts(e.target.value), 300);
+        searchTimeout = setTimeout(() => applyFilters(), 300);
     });
 });
 
-async function loadProducts(search = "") {
-    const url = search ? `${API}?search=${encodeURIComponent(search)}` : API;
-    const res = await fetch(url);
+async function loadProducts() {
+    const res = await fetch(API);
     allProducts = await res.json();
-    renderProducts(allProducts);
-    updateStats(allProducts);
+    populateCategoryFilter();
+    applyFilters();
+}
+
+function populateCategoryFilter() {
+    const select = document.getElementById("categoryFilter");
+    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+    const current = select.value;
+    select.innerHTML = '<option value="">All Categories</option>' +
+        categories.map(c => `<option value="${c}"${c === current ? " selected" : ""}>${c}</option>`).join("");
+}
+
+function applyFilters() {
+    const search = document.getElementById("searchInput").value.trim().toLowerCase();
+    const category = document.getElementById("categoryFilter").value;
+    const minPrice = parseFloat(document.getElementById("priceMin").value);
+    const maxPrice = parseFloat(document.getElementById("priceMax").value);
+
+    let filtered = allProducts.filter(p => {
+        if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search)) return false;
+        if (category && p.category !== category) return false;
+        if (!isNaN(minPrice) && p.price < minPrice) return false;
+        if (!isNaN(maxPrice) && p.price > maxPrice) return false;
+        return true;
+    });
+
+    renderProducts(filtered);
+    updateStats(filtered);
+}
+
+function clearFilters() {
+    document.getElementById("searchInput").value = "";
+    document.getElementById("categoryFilter").value = "";
+    document.getElementById("priceMin").value = "";
+    document.getElementById("priceMax").value = "";
+    applyFilters();
 }
 
 const PLACEHOLDER_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
@@ -140,7 +173,7 @@ async function saveProduct() {
 
     bootstrap.Modal.getInstance(document.getElementById("productModal")).hide();
     showToast(id ? "Product updated" : "Product created", "success");
-    loadProducts(document.getElementById("searchInput").value);
+    loadProducts();
 }
 
 function showDeleteModal(id, name) {
@@ -152,7 +185,7 @@ function showDeleteModal(id, name) {
         if (res.ok) {
             modal.hide();
             showToast("Product deleted", "success");
-            loadProducts(document.getElementById("searchInput").value);
+            loadProducts();
         } else {
             showToast("Failed to delete", "danger");
         }
@@ -208,7 +241,7 @@ async function importProducts() {
         }
         alertDiv.className = "alert alert-success";
         alertDiv.innerHTML = msg;
-        loadProducts(document.getElementById("searchInput").value);
+        loadProducts();
     } else {
         let msg = `<i class="bi bi-x-circle me-2"></i>No products imported.`;
         if (data.errors && data.errors.length > 0) {
