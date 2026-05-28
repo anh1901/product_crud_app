@@ -552,7 +552,7 @@ function renderCustomers(customers) {
             const date = c.last_deal_date ? new Date(c.last_deal_date).toLocaleDateString("vi-VN") : "—";
             return `<tr style="cursor:pointer" onclick="viewCustomerDeals('${escapeHtml(c.customer_name)}')">
                 <td class="fw-bold">${escapeHtml(c.customer_name)}</td>
-                <td>${c.customer_phone ? escapeHtml(c.customer_phone) : '<span class="text-muted">—</span>'}</td>
+                <td>${c.customer_phone ? `${escapeHtml(c.customer_phone)} <a href="https://zalo.me/${c.customer_phone}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" title="Chat on Zalo"><i class="bi bi-chat-dots-fill"></i></a>` : '<span class="text-muted">—</span>'}</td>
                 <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.customer_address ? escapeHtml(c.customer_address) : '—'}</td>
                 <td class="text-center"><span class="badge bg-primary">${c.deal_count}</span></td>
                 <td class="text-center">${c.active_deals > 0 ? `<span class="badge bg-warning text-dark">${c.active_deals}</span>` : '<span class="text-muted">0</span>'}</td>
@@ -619,7 +619,7 @@ function renderDeals(deals) {
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <h6 class="mb-1 fw-bold">${escapeHtml(d.customer_name)}</h6>
-                    <small class="text-muted">${d.customer_phone ? escapeHtml(d.customer_phone) + " | " : ""}${date}</small>
+                    <small class="text-muted">${d.customer_phone ? escapeHtml(d.customer_phone) + ` <a href="https://zalo.me/${d.customer_phone}" target="_blank" class="text-primary" title="Zalo" onclick="event.stopPropagation()"><i class="bi bi-chat-dots-fill"></i></a> | ` : ""}${date}</small>
                     <p class="mb-0 small text-muted mt-1" style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(itemNames)}</p>
                 </div>
                 <div class="text-end">
@@ -654,7 +654,7 @@ async function showDealDetail(dealId) {
             <div class="col-md-6">
                 <h6 class="text-muted mb-1">Customer</h6>
                 <p class="fw-bold mb-1">${escapeHtml(deal.customer_name)}</p>
-                ${deal.customer_phone ? `<p class="mb-1"><i class="bi bi-telephone me-1"></i>${escapeHtml(deal.customer_phone)}</p>` : ""}
+                ${deal.customer_phone ? `<p class="mb-1"><i class="bi bi-telephone me-1"></i>${escapeHtml(deal.customer_phone)} <a href="https://zalo.me/${deal.customer_phone}" target="_blank" class="btn btn-sm btn-primary py-0 px-2 ms-1"><i class="bi bi-chat-dots-fill me-1"></i>Zalo</a></p>` : ""}
                 ${deal.customer_address ? `<p class="mb-1"><i class="bi bi-geo-alt me-1"></i>${escapeHtml(deal.customer_address)}</p>` : ""}
                 ${deal.notes ? `<p class="mb-0 text-muted"><i class="bi bi-sticky me-1"></i>${escapeHtml(deal.notes)}</p>` : ""}
             </div>
