@@ -109,3 +109,28 @@ details summary {
 .cart-item:last-child {
     border-bottom: none;
 }
+
+.discount-section .input-group {
+    background: #fff3cd;
+    border-radius: 0.375rem;
+}
+
+.discount-section .form-control,
+.discount-section .input-group-text {
+    background: transparent;
+    border-color: #ffc107;
+}
+
+.profit-section {
+    background: #e8f5e9;
+    border: 1px solid #c8e6c9;
+}
+
+.profit-section.negative {
+    background: #ffebee;
+    border-color: #ffcdd2;
+}
+
+@media print {
+    .no-print { display: none !important; }
+}

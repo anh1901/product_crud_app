@@ -120,6 +120,14 @@
                             </div>
                         </div>
                         <div class="mb-3">
+                            <label for="productCostPrice" class="form-label">Cost Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="productCostPrice" step="0.01" min="0" placeholder="Your cost">
+                            </div>
+                            <small class="text-muted">Your cost for profit tracking (not shown to customers)</small>
+                        </div>
+                        <div class="mb-3">
                             <label for="productCategory" class="form-label">Category</label>
                             <input type="text" class="form-control" id="productCategory" placeholder="e.g. Electronics">
                         </div>
@@ -246,13 +254,60 @@ Coffee Mug,12.50,Ceramic 350ml,Kitchen</pre>
                 <span class="text-muted">Items:</span>
                 <span id="cartItemCount" class="fw-semibold">0</span>
             </div>
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted">Subtotal:</span>
+                <span id="cartSubtotal" class="fw-semibold">$0.00</span>
+            </div>
+            <div class="discount-section mb-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-percent"></i></span>
+                    <input type="number" class="form-control" id="discountInput" min="0" max="100" step="0.5" value="0" placeholder="Discount %" oninput="renderCart()">
+                    <span class="input-group-text">discount</span>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2" id="discountRow" style="display:none!important">
+                <span class="text-danger">Discount:</span>
+                <span id="cartDiscount" class="text-danger fw-semibold">-$0.00</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="fs-5 fw-bold">Total:</span>
                 <span class="fs-5 fw-bold text-success" id="cartTotal">$0.00</span>
             </div>
+            <div class="profit-section p-2 rounded mb-2" id="profitSection">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small"><i class="bi bi-lock-fill me-1"></i>Your Profit:</span>
+                    <span id="cartProfit" class="fw-bold">$0.00</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small">Margin:</span>
+                    <span id="cartMargin" class="fw-semibold small">0%</span>
+                </div>
+            </div>
+            <button class="btn btn-primary w-100 mb-2" onclick="showDealSummary()">
+                <i class="bi bi-receipt me-1"></i>Deal Summary
+            </button>
             <button class="btn btn-danger w-100 mb-2" onclick="clearCart()">
                 <i class="bi bi-trash me-1"></i>Clear Cart
             </button>
+        </div>
+    </div>
+
+    <!-- Deal Summary Modal -->
+    <div class="modal fade" id="dealSummaryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-receipt me-2"></i>Deal Summary</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="dealSummaryBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="printDealSummary()">
+                        <i class="bi bi-printer me-1"></i>Print
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

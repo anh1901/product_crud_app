@@ -83,6 +83,7 @@ function showEditModal(id) {
     document.getElementById("productId").value = product.id;
     document.getElementById("productName").value = product.name;
     document.getElementById("productPrice").value = product.price;
+    document.getElementById("productCostPrice").value = product.cost_price || "";
     document.getElementById("productCategory").value = product.category || "";
     document.getElementById("productDescription").value =
         product.description || "";
@@ -103,7 +104,8 @@ async function saveProduct() {
         return;
     }
 
-    const body = { name, price: parseFloat(price), category, description };
+    const costPrice = document.getElementById("productCostPrice").value;
+    const body = { name, price: parseFloat(price), cost_price: costPrice ? parseFloat(costPrice) : 0, category, description };
     const url = id ? `${API}/${id}` : API;
     const method = id ? "PUT" : "POST";
 
@@ -239,7 +241,7 @@ function addToCart(productId) {
     if (existing) {
         existing.qty += 1;
     } else {
-        cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
+        cart.push({ id: product.id, name: product.name, price: product.price, cost_price: product.cost_price || 0, qty: 1 });
     }
     renderCart();
     showToast(`${product.name} added to cart`, "success");
@@ -273,8 +275,74 @@ function setCartQty(productId, value) {
 
 function clearCart() {
     cart = [];
+    document.getElementById("discountInput").value = 0;
     renderCart();
     showToast("Cart cleared", "success");
+}
+
+function showDealSummary() {
+    if (cart.length === 0) return;
+    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    let subtotal = 0;
+    const rows = cart.map((item) => {
+        const lineTotal = item.price * item.qty;
+        subtotal += lineTotal;
+        return `<tr>
+            <td>${escapeHtml(item.name)}</td>
+            <td class="text-center">${item.qty}</td>
+            <td class="text-end">$${Number(item.price).toFixed(2)}</td>
+            <td class="text-end">$${lineTotal.toFixed(2)}</td>
+        </tr>`;
+    }).join("");
+    const discountAmt = subtotal * (discountPct / 100);
+    const finalTotal = subtotal - discountAmt;
+    const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+    document.getElementById("dealSummaryBody").innerHTML = `
+        <div id="dealPrintArea">
+            <div class="text-center mb-4">
+                <h4 class="fw-bold">Deal Quotation</h4>
+                <p class="text-muted mb-0">${date}</p>
+            </div>
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Product</th>
+                        <th class="text-center" style="width:80px">Qty</th>
+                        <th class="text-end" style="width:120px">Unit Price</th>
+                        <th class="text-end" style="width:120px">Total</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="text-end fw-semibold">Subtotal</td>
+                        <td class="text-end fw-semibold">$${subtotal.toFixed(2)}</td>
+                    </tr>
+                    ${discountPct > 0 ? `<tr>
+                        <td colspan="3" class="text-end text-danger">Discount (${discountPct}%)</td>
+                        <td class="text-end text-danger">-$${discountAmt.toFixed(2)}</td>
+                    </tr>` : ""}
+                    <tr class="table-primary">
+                        <td colspan="3" class="text-end fs-5 fw-bold">Grand Total</td>
+                        <td class="text-end fs-5 fw-bold">$${finalTotal.toFixed(2)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            ${discountPct > 0 ? `<p class="text-muted small">* A ${discountPct}% bulk discount has been applied.</p>` : ""}
+        </div>`;
+    new bootstrap.Modal(document.getElementById("dealSummaryModal")).show();
+}
+
+function printDealSummary() {
+    const content = document.getElementById("dealPrintArea").innerHTML;
+    const win = window.open("", "_blank");
+    win.document.write(`<html><head><title>Deal Summary</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>body{padding:2rem}@media print{body{padding:0}}</style>
+        </head><body>${content}</body></html>`);
+    win.document.close();
+    win.onload = () => { win.print(); };
 }
 
 function renderCart() {
@@ -295,11 +363,13 @@ function renderCart() {
     }
 
     footer.style.display = "block";
-    let total = 0;
+    let subtotalSum = 0;
+    let costSum = 0;
     body.innerHTML = cart
         .map((item) => {
             const subtotal = item.price * item.qty;
-            total += subtotal;
+            subtotalSum += subtotal;
+            costSum += (item.cost_price || 0) * item.qty;
             return `
             <div class="cart-item">
                 <div class="d-flex justify-content-between align-items-start mb-1">
@@ -322,6 +392,27 @@ function renderCart() {
         })
         .join("");
 
+    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    const discountAmt = subtotalSum * (discountPct / 100);
+    const finalTotal = subtotalSum - discountAmt;
+    const profit = finalTotal - costSum;
+    const margin = finalTotal > 0 ? (profit / finalTotal) * 100 : 0;
+
     document.getElementById("cartItemCount").textContent = totalItems;
-    document.getElementById("cartTotal").textContent = `$${total.toFixed(2)}`;
+    document.getElementById("cartSubtotal").textContent = `$${subtotalSum.toFixed(2)}`;
+
+    const discountRow = document.getElementById("discountRow");
+    if (discountPct > 0) {
+        discountRow.style.display = "flex";
+        discountRow.style.setProperty("display", "flex", "important");
+        document.getElementById("cartDiscount").textContent = `-$${discountAmt.toFixed(2)}`;
+    } else {
+        discountRow.style.setProperty("display", "none", "important");
+    }
+
+    document.getElementById("cartTotal").textContent = `$${finalTotal.toFixed(2)}`;
+    document.getElementById("cartProfit").textContent = `$${profit.toFixed(2)}`;
+    document.getElementById("cartProfit").className = `fw-bold ${profit >= 0 ? "text-success" : "text-danger"}`;
+    document.getElementById("cartMargin").textContent = `${margin.toFixed(1)}%`;
+    document.getElementById("cartMargin").className = `fw-semibold small ${profit >= 0 ? "text-success" : "text-danger"}`;
 }

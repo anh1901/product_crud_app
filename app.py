@@ -25,6 +25,7 @@ def init_db():
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             price REAL NOT NULL,
+            cost_price REAL DEFAULT 0,
             description TEXT DEFAULT '',
             category TEXT DEFAULT '',
             created_at TEXT NOT NULL,
@@ -32,6 +33,10 @@ def init_db():
         )
     """
     )
+    # Migrate: add cost_price column if missing
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(products)").fetchall()]
+    if "cost_price" not in cols:
+        conn.execute("ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0")
     conn.commit()
     conn.close()
 
@@ -90,10 +95,16 @@ def create_product():
     if price < 0:
         return jsonify({"error": "Price must be non-negative"}), 400
 
+    try:
+        cost_price = float(data.get("cost_price", 0))
+    except (ValueError, TypeError):
+        cost_price = 0
+
     product = {
         "id": str(uuid.uuid4()),
         "name": data["name"].strip(),
         "price": price,
+        "cost_price": max(cost_price, 0),
         "description": data.get("description", "").strip(),
         "category": data.get("category", "").strip(),
         "created_at": now_iso(),
@@ -102,11 +113,12 @@ def create_product():
 
     conn = get_db()
     conn.execute(
-        "INSERT INTO products (id, name, price, description, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO products (id, name, price, cost_price, description, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             product["id"],
             product["name"],
             product["price"],
+            product["cost_price"],
             product["description"],
             product["category"],
             product["created_at"],
@@ -147,14 +159,20 @@ def update_product(product_id):
         conn.close()
         return jsonify({"error": "Price must be non-negative"}), 400
 
+    try:
+        cost_price = float(data.get("cost_price", existing["cost_price"]))
+    except (ValueError, TypeError):
+        cost_price = 0
+    cost_price = max(cost_price, 0)
+
     if not name:
         conn.close()
         return jsonify({"error": "Name is required"}), 400
 
     updated_at = now_iso()
     conn.execute(
-        "UPDATE products SET name = ?, price = ?, description = ?, category = ?, updated_at = ? WHERE id = ?",
-        (name, price, description, category, updated_at, product_id),
+        "UPDATE products SET name = ?, price = ?, cost_price = ?, description = ?, category = ?, updated_at = ? WHERE id = ?",
+        (name, price, cost_price, description, category, updated_at, product_id),
     )
     conn.commit()
 
@@ -228,10 +246,16 @@ def import_products():
             errors.append({"row": i + 1, "error": "Price must be non-negative"})
             continue
 
+        try:
+            cost_price = max(float(item.get("cost_price", 0)), 0)
+        except (ValueError, TypeError):
+            cost_price = 0
+
         product = {
             "id": str(uuid.uuid4()),
             "name": name,
             "price": price,
+            "cost_price": cost_price,
             "description": str(item.get("description", "")).strip(),
             "category": str(item.get("category", "")).strip(),
             "created_at": now_iso(),
@@ -239,11 +263,12 @@ def import_products():
         }
 
         conn.execute(
-            "INSERT INTO products (id, name, price, description, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO products (id, name, price, cost_price, description, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 product["id"],
                 product["name"],
                 product["price"],
+                product["cost_price"],
                 product["description"],
                 product["category"],
                 product["created_at"],
@@ -272,6 +297,7 @@ def _parse_csv(content):
             {
                 "name": row.get("name", ""),
                 "price": row.get("price", "0"),
+                "cost_price": row.get("cost_price", "0"),
                 "description": row.get("description", ""),
                 "category": row.get("category", ""),
             }
