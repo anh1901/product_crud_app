@@ -728,7 +728,7 @@ async function saveCombo() {
 
     if (!name) { showToast("Combo name is required", "danger"); return; }
     if (!comboPrice || comboPrice <= 0) { showToast("Set a valid combo price", "danger"); return; }
-    if (comboItems.length < 2) { showToast("Add at least 2 products", "danger"); return; }
+    if (comboItems.length < 1) { showToast("Add at least 1 product", "danger"); return; }
 
     const body = { name, combo_price: comboPrice, description, items: comboItems };
     const url = comboId ? `/api/combos/${comboId}` : "/api/combos";

@@ -389,8 +389,8 @@ def create_combo():
     if not data or not data.get("name"):
         return jsonify({"error": "Combo name is required"}), 400
     items = data.get("items", [])
-    if len(items) < 2:
-        return jsonify({"error": "A combo needs at least 2 products"}), 400
+    if len(items) < 1:
+        return jsonify({"error": "A combo needs at least 1 product"}), 400
     combo_price = float(data.get("combo_price", 0))
     if combo_price <= 0:
         return jsonify({"error": "Combo price must be greater than 0"}), 400
@@ -427,8 +427,8 @@ def update_combo(combo_id):
     if not data or not data.get("name"):
         return jsonify({"error": "Combo name is required"}), 400
     items = data.get("items", [])
-    if len(items) < 2:
-        return jsonify({"error": "A combo needs at least 2 products"}), 400
+    if len(items) < 1:
+        return jsonify({"error": "A combo needs at least 1 product"}), 400
     combo_price = float(data.get("combo_price", 0))
     if combo_price <= 0:
         return jsonify({"error": "Combo price must be greater than 0"}), 400
