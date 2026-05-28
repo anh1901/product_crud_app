@@ -35,28 +35,13 @@ function populateCategoryFilter() {
 
 function applyFilters() {
     const search = document.getElementById("searchInput").value.trim().toLowerCase();
-    const category = document.getElementById("categoryFilter").value;
-    const minPrice = parseFloat(document.getElementById("priceMin").value);
-    const maxPrice = parseFloat(document.getElementById("priceMax").value);
 
     let filtered = allProducts.filter(p => {
         if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search)) return false;
-        if (category && p.category !== category) return false;
-        if (!isNaN(minPrice) && p.price < minPrice) return false;
-        if (!isNaN(maxPrice) && p.price > maxPrice) return false;
         return true;
     });
 
     renderProducts(filtered);
-    updateStats(filtered);
-}
-
-function clearFilters() {
-    document.getElementById("searchInput").value = "";
-    document.getElementById("categoryFilter").value = "";
-    document.getElementById("priceMin").value = "";
-    document.getElementById("priceMax").value = "";
-    applyFilters();
 }
 
 const PLACEHOLDER_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
@@ -111,7 +96,23 @@ function renderProductGrid(gridId, products, mode) {
 }
 
 function renderProducts(products) {
-    renderProductGrid("productGrid", products, "manage");
+    const tbody = document.getElementById("productTableBody");
+    if (products.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
+            <i class="bi bi-inbox fs-3 d-block mb-2"></i>No products found.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = products.map(p => `<tr>
+        <td class="fw-bold">${escapeHtml(p.name)}</td>
+        <td>${p.category ? `<span class="badge bg-secondary">${escapeHtml(p.category)}</span>` : '<span class="text-muted">—</span>'}</td>
+        <td class="text-end fw-semibold text-success">${formatVND(p.price)}</td>
+        <td class="text-end text-muted">${p.cost_price ? formatVND(p.cost_price) : '—'}</td>
+        <td class="text-muted" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.description || '—')}</td>
+        <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditModal('${p.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join("");
 }
 
 function renderShop(products) {
@@ -487,10 +488,10 @@ function toggleView(view) {
     views.forEach(v => document.getElementById(v).style.display = "none");
     tabs.forEach(t => document.getElementById(t).classList.remove("active"));
 
-    if (view === "shop") {
-        document.getElementById("shopView").style.display = "block";
-        document.getElementById("tabShop").classList.add("active");
-        applyShopFilters();
+    if (view === "products") {
+        document.getElementById("productsView").style.display = "block";
+        document.getElementById("tabProducts").classList.add("active");
+        applyFilters();
     } else if (view === "deals") {
         document.getElementById("dealsView").style.display = "block";
         document.getElementById("tabDeals").classList.add("active");
@@ -500,8 +501,9 @@ function toggleView(view) {
         document.getElementById("tabCustomers").classList.add("active");
         loadCustomers();
     } else {
-        document.getElementById("productsView").style.display = "block";
-        document.getElementById("tabProducts").classList.add("active");
+        document.getElementById("shopView").style.display = "block";
+        document.getElementById("tabShop").classList.add("active");
+        applyShopFilters();
     }
 }
 

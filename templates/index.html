@@ -11,15 +11,15 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container-fluid px-4">
-            <a class="navbar-brand fw-bold" href="#" onclick="toggleView('products')">
+            <a class="navbar-brand fw-bold" href="#" onclick="toggleView('shop')">
                 <i class="bi bi-grid-1x2-fill me-2"></i>Dashboard
             </a>
             <div class="d-flex align-items-center gap-1">
-                <button class="btn btn-sm nav-tab-btn active" id="tabProducts" onclick="toggleView('products')">
-                    <i class="bi bi-box-seam me-1"></i>Products
-                </button>
-                <button class="btn btn-sm nav-tab-btn" id="tabShop" onclick="toggleView('shop')">
+                <button class="btn btn-sm nav-tab-btn active" id="tabShop" onclick="toggleView('shop')">
                     <i class="bi bi-shop me-1"></i>Shop
+                </button>
+                <button class="btn btn-sm nav-tab-btn" id="tabProducts" onclick="toggleView('products')">
+                    <i class="bi bi-box-seam me-1"></i>Products
                 </button>
                 <button class="btn btn-sm nav-tab-btn" id="tabCustomers" onclick="toggleView('customers')">
                     <i class="bi bi-people me-1"></i>Customers
@@ -38,58 +38,8 @@
     </nav>
 
     <div class="container-fluid px-4 py-4">
-        <!-- Products View -->
-        <div id="productsView">
-        <!-- Search & Filter Bar -->
-        <div class="filter-bar mb-4">
-            <div class="row g-2 align-items-end">
-                <div class="col-lg-4 col-md-6">
-                    <label class="filter-label"><i class="bi bi-search me-1"></i>Search</label>
-                    <input type="text" class="form-control" id="searchInput" placeholder="Type product name...">
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <label class="filter-label"><i class="bi bi-tag me-1"></i>Category</label>
-                    <select class="form-select" id="categoryFilter" onchange="applyFilters()">
-                        <option value="">All Categories</option>
-                    </select>
-                </div>
-                <div class="col-lg-2 col-md-4">
-                    <label class="filter-label"><i class="bi bi-cash me-1"></i>Min Price</label>
-                    <input type="number" class="form-control" id="priceMin" placeholder="From" min="0" oninput="applyFilters()">
-                </div>
-                <div class="col-lg-2 col-md-4">
-                    <label class="filter-label">Max Price</label>
-                    <input type="number" class="form-control" id="priceMax" placeholder="To" min="0" oninput="applyFilters()">
-                </div>
-                <div class="col-lg-1 col-md-2 col-3">
-                    <button class="btn btn-outline-secondary w-100" onclick="clearFilters()" title="Clear filters">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-                <div class="col-auto ms-auto">
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-success d-flex align-items-center gap-1" onclick="showAddModal()">
-                            <i class="bi bi-plus-circle-fill"></i> Add
-                        </button>
-                        <button class="btn btn-outline-secondary d-flex align-items-center gap-1" onclick="showImportModal()">
-                            <i class="bi bi-cloud-upload-fill"></i> Import
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Product Grid -->
-        <div class="row g-3" id="productGrid">
-            <div class="col-12 text-center py-5 text-muted">
-                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                No products yet. Add one to get started!
-            </div>
-        </div>
-        </div>
-
-        <!-- Shop View -->
-        <div id="shopView" style="display:none">
+        <!-- Shop View (default) -->
+        <div id="shopView">
             <div class="filter-bar mb-4">
                 <div class="row g-2 align-items-end">
                     <div class="col-lg-6 col-md-6">
@@ -110,6 +60,40 @@
                 </div>
             </div>
             <div class="row g-3" id="shopGrid"></div>
+        </div>
+
+        <!-- Products View -->
+        <div id="productsView" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0"><i class="bi bi-box-seam me-2"></i>Products</h4>
+                <div class="d-flex gap-2">
+                    <div class="input-group" style="width:250px">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search products..." oninput="clearTimeout(searchTimeout);searchTimeout=setTimeout(()=>applyFilters(),300)">
+                    </div>
+                    <button class="btn btn-success d-flex align-items-center gap-1" onclick="showAddModal()">
+                        <i class="bi bi-plus-circle-fill"></i> Add
+                    </button>
+                    <button class="btn btn-outline-secondary d-flex align-items-center gap-1" onclick="showImportModal()">
+                        <i class="bi bi-cloud-upload-fill"></i> Import
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle bg-white rounded shadow-sm" id="productTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th class="text-end">Price</th>
+                            <th class="text-end">Cost</th>
+                            <th>Description</th>
+                            <th class="text-center" style="width:120px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productTableBody"></tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Customers View -->
