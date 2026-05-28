@@ -13,28 +13,6 @@ body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-/* Compact Stat Chips */
-.stat-card-sm {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.85rem;
-    border-radius: 20px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    background: var(--bg-card);
-    box-shadow: var(--shadow-sm);
-    color: #374151;
-}
-
-.stat-card-sm i { font-size: 0.9rem; }
-.stat-card-sm span { font-weight: 700; }
-
-.stat-card-success { color: #059669; }
-.stat-card-success i { color: #059669; }
-.stat-card-info { color: #0891b2; }
-.stat-card-info i { color: #0891b2; }
-
 /* Product Cards */
 .product-card {
     background: var(--bg-card);

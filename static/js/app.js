@@ -108,15 +108,7 @@ function renderProducts(products) {
         .join("");
 }
 
-function updateStats(products) {
-    const categories = new Set(products.map((p) => p.category).filter(Boolean));
-    document.getElementById("statCategories").textContent = categories.size;
-    const avg =
-        products.length > 0
-            ? products.reduce((sum, p) => sum + p.price, 0) / products.length
-            : 0;
-    document.getElementById("statAvgPrice").textContent = formatVND(avg);
-}
+function updateStats(products) {}
 
 function showAddModal() {
     document.getElementById("productModalTitle").textContent = "Add Product";

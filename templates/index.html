@@ -22,32 +22,6 @@
     </nav>
 
     <div class="container-fluid px-4 py-4">
-        <!-- Stats Row -->
-        <div class="row g-2 mb-3">
-            <div class="col-auto">
-                <div class="stat-card-sm stat-card-success">
-                    <i class="bi bi-tags-fill"></i>
-                    <span id="statCategories">0</span> categories
-                </div>
-            </div>
-            <div class="col-auto">
-                <div class="stat-card-sm stat-card-info">
-                    <i class="bi bi-cash-stack"></i>
-                    Avg. <span id="statAvgPrice">0₫</span>
-                </div>
-            </div>
-            <div class="col-auto ms-auto">
-                <div class="d-flex gap-2">
-                    <button class="btn btn-success btn-sm d-flex align-items-center gap-1" onclick="showAddModal()">
-                        <i class="bi bi-plus-circle-fill"></i> Add Product
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" onclick="showImportModal()">
-                        <i class="bi bi-cloud-upload-fill"></i> Import
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- Search & Filter Bar -->
         <div class="filter-bar mb-4">
             <div class="row g-2 align-items-end">
@@ -69,10 +43,20 @@
                     <label class="filter-label">Max Price</label>
                     <input type="number" class="form-control" id="priceMax" placeholder="To" min="0" oninput="applyFilters()">
                 </div>
-                <div class="col-lg-1 col-md-4">
+                <div class="col-lg-1 col-md-2 col-3">
                     <button class="btn btn-outline-secondary w-100" onclick="clearFilters()" title="Clear filters">
                         <i class="bi bi-x-lg"></i>
                     </button>
+                </div>
+                <div class="col-auto ms-auto">
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success d-flex align-items-center gap-1" onclick="showAddModal()">
+                            <i class="bi bi-plus-circle-fill"></i> Add
+                        </button>
+                        <button class="btn btn-outline-secondary d-flex align-items-center gap-1" onclick="showImportModal()">
+                            <i class="bi bi-cloud-upload-fill"></i> Import
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
