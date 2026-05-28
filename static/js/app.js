@@ -57,16 +57,26 @@ function getPlaceholderColor(name) {
 function renderProductCard(p, mode) {
     const color = getPlaceholderColor(p.name);
     const initials = p.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
-    const actions = mode === "shop"
-        ? `<button class="btn btn-sm btn-warning ms-auto" onclick="addToCart('${p.id}')" title="Add to cart">
-               <i class="bi bi-cart-plus me-1"></i>Add
-           </button>`
-        : `<button class="btn btn-sm btn-outline-primary" onclick="showEditModal('${p.id}')" title="Edit">
-               <i class="bi bi-pencil"></i>
-           </button>
-           <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
-               <i class="bi bi-trash"></i>
-           </button>`;
+    if (mode === "shop") {
+        return `
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6">
+            <div class="shop-card">
+                <div class="shop-card-icon" style="background:linear-gradient(135deg, ${color}, ${color}cc)">
+                    <span class="initials">${initials}</span>
+                </div>
+                <div class="shop-card-body">
+                    <div class="shop-card-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
+                    ${p.category ? `<div class="shop-card-cat">${escapeHtml(p.category)}</div>` : ""}
+                </div>
+                <div class="shop-card-right">
+                    <div class="shop-card-price">${formatVND(p.price)}</div>
+                    <button class="btn btn-warning shop-card-btn" onclick="addToCart('${p.id}')">
+                        <i class="bi bi-cart-plus"></i>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }
     return `
     <div class="col-xl-3 col-lg-4 col-md-6">
         <div class="product-card">
@@ -79,7 +89,14 @@ function renderProductCard(p, mode) {
                 <p class="product-desc">${escapeHtml(p.description || "No description")}</p>
                 <div class="product-price">${formatVND(p.price)}</div>
             </div>
-            <div class="product-actions">${actions}</div>
+            <div class="product-actions">
+                <button class="btn btn-sm btn-outline-primary" onclick="showEditModal('${p.id}')" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
         </div>
     </div>`;
 }
@@ -126,23 +143,20 @@ function renderComboCard(c) {
     const savePct = c.original_price > 0 ? ((saving / c.original_price) * 100).toFixed(0) : 0;
     const productList = c.items.map(i => `${i.product_name} ×${i.qty}`).join(", ");
     return `
-    <div class="col-xl-3 col-lg-4 col-md-6">
-        <div class="product-card">
-            <div class="product-img" style="background:linear-gradient(135deg, #f59e0b, #ef4444dd)">
-                <span class="product-initials"><i class="bi bi-collection"></i></span>
-                <span class="product-badge bg-danger">-${savePct}% COMBO</span>
+    <div class="col-xl-2 col-lg-3 col-md-4 col-6">
+        <div class="shop-card combo-card">
+            <div class="shop-card-icon" style="background:linear-gradient(135deg, #f59e0b, #ef4444)">
+                <span class="initials"><i class="bi bi-collection"></i></span>
             </div>
-            <div class="product-info">
-                <h6 class="product-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</h6>
-                <p class="product-desc">${escapeHtml(productList)}</p>
-                <div class="d-flex align-items-center gap-2">
-                    <div class="product-price">${formatVND(c.combo_price)}</div>
-                    <small class="text-muted text-decoration-line-through">${formatVND(c.original_price)}</small>
-                </div>
+            <div class="shop-card-body">
+                <div class="shop-card-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>
+                <div class="shop-card-cat">${escapeHtml(productList)}</div>
             </div>
-            <div class="product-actions">
-                <button class="btn btn-sm btn-warning ms-auto" onclick="addComboToCart('${c.id}')" title="Add combo to cart">
-                    <i class="bi bi-cart-plus me-1"></i>Add Combo
+            <div class="shop-card-right">
+                <div class="shop-card-price">${formatVND(c.combo_price)}</div>
+                <span class="combo-tag badge bg-danger">-${savePct}%</span>
+                <button class="btn btn-warning shop-card-btn" onclick="addComboToCart('${c.id}')">
+                    <i class="bi bi-cart-plus"></i>
                 </button>
             </div>
         </div>
