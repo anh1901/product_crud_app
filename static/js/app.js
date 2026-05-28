@@ -1,6 +1,7 @@
 const API = "/api/products";
 let allProducts = [];
 let searchTimeout = null;
+let cart = [];
 
 document.addEventListener("DOMContentLoaded", () => {
     loadProducts();
@@ -45,6 +46,11 @@ function renderProducts(products) {
                 </button>
                 <button class="btn btn-sm btn-outline-danger btn-action" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
                     <i class="bi bi-trash"></i>
+                </button>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-warning" onclick="addToCart('${p.id}')" title="Add to cart">
+                    <i class="bi bi-cart-plus"></i>
                 </button>
             </td>
         </tr>`
@@ -215,4 +221,107 @@ function escapeHtml(str) {
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
+}
+
+// --- Cart ---
+
+function toggleCart() {
+    const sidebar = document.getElementById("cartSidebar");
+    const overlay = document.getElementById("cartOverlay");
+    const open = sidebar.classList.toggle("open");
+    overlay.classList.toggle("open", open);
+}
+
+function addToCart(productId) {
+    const product = allProducts.find((p) => p.id === productId);
+    if (!product) return;
+    const existing = cart.find((item) => item.id === productId);
+    if (existing) {
+        existing.qty += 1;
+    } else {
+        cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
+    }
+    renderCart();
+    showToast(`${product.name} added to cart`, "success");
+}
+
+function removeFromCart(productId) {
+    cart = cart.filter((item) => item.id !== productId);
+    renderCart();
+}
+
+function updateCartQty(productId, delta) {
+    const item = cart.find((i) => i.id === productId);
+    if (!item) return;
+    item.qty += delta;
+    if (item.qty <= 0) {
+        cart = cart.filter((i) => i.id !== productId);
+    }
+    renderCart();
+}
+
+function setCartQty(productId, value) {
+    const qty = parseInt(value, 10);
+    if (isNaN(qty) || qty <= 0) {
+        cart = cart.filter((i) => i.id !== productId);
+    } else {
+        const item = cart.find((i) => i.id === productId);
+        if (item) item.qty = qty;
+    }
+    renderCart();
+}
+
+function clearCart() {
+    cart = [];
+    renderCart();
+    showToast("Cart cleared", "success");
+}
+
+function renderCart() {
+    const body = document.getElementById("cartBody");
+    const footer = document.getElementById("cartFooter");
+    const countBadge = document.getElementById("cartCount");
+    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
+    countBadge.textContent = totalItems;
+
+    if (cart.length === 0) {
+        body.innerHTML = `
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+                Cart is empty. Add products to start a deal.
+            </div>`;
+        footer.style.display = "none";
+        return;
+    }
+
+    footer.style.display = "block";
+    let total = 0;
+    body.innerHTML = cart
+        .map((item) => {
+            const subtotal = item.price * item.qty;
+            total += subtotal;
+            return `
+            <div class="cart-item">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <strong class="me-2">${escapeHtml(item.name)}</strong>
+                    <button class="btn btn-sm btn-outline-danger border-0 p-0" onclick="removeFromCart('${item.id}')" title="Remove">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="input-group input-group-sm" style="width:120px">
+                        <button class="btn btn-outline-secondary" onclick="updateCartQty('${item.id}', -1)">−</button>
+                        <input type="number" class="form-control text-center" value="${item.qty}" min="1"
+                               onchange="setCartQty('${item.id}', this.value)" style="max-width:50px">
+                        <button class="btn btn-outline-secondary" onclick="updateCartQty('${item.id}', 1)">+</button>
+                    </div>
+                    <span class="text-success fw-semibold">$${subtotal.toFixed(2)}</span>
+                </div>
+                <small class="text-muted">$${Number(item.price).toFixed(2)} each</small>
+            </div>`;
+        })
+        .join("");
+
+    document.getElementById("cartItemCount").textContent = totalItems;
+    document.getElementById("cartTotal").textContent = `$${total.toFixed(2)}`;
 }
