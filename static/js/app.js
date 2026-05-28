@@ -546,18 +546,24 @@ function renderCustomers(customers) {
                 <th class="text-center">Active</th>
                 <th class="text-end">Total Spent</th>
                 <th>Last Deal</th>
+                <th class="text-center" style="width:140px">Actions</th>
             </tr>
         </thead>
         <tbody>${customers.map(c => {
             const date = c.last_deal_date ? new Date(c.last_deal_date).toLocaleDateString("vi-VN") : "—";
-            return `<tr style="cursor:pointer" onclick="viewCustomerDeals('${escapeHtml(c.customer_name)}')">
-                <td class="fw-bold">${escapeHtml(c.customer_name)}</td>
+            const nameEsc = escapeHtml(c.customer_name).replace(/'/g, "\\'");
+            return `<tr>
+                <td class="fw-bold" style="cursor:pointer" onclick="viewCustomerDeals('${nameEsc}')">${escapeHtml(c.customer_name)}</td>
                 <td>${c.customer_phone ? `${escapeHtml(c.customer_phone)} <a href="https://zalo.me/${c.customer_phone}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" title="Chat on Zalo"><i class="bi bi-chat-dots-fill"></i></a>` : '<span class="text-muted">—</span>'}</td>
                 <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.customer_address ? escapeHtml(c.customer_address) : '—'}</td>
                 <td class="text-center"><span class="badge bg-primary">${c.deal_count}</span></td>
                 <td class="text-center">${c.active_deals > 0 ? `<span class="badge bg-warning text-dark">${c.active_deals}</span>` : '<span class="text-muted">0</span>'}</td>
                 <td class="text-end fw-semibold text-success">${formatVND(c.total_spent)}</td>
                 <td class="text-muted small">${date}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditCustomer('${nameEsc}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="showDeleteCustomer('${nameEsc}')" title="Delete"><i class="bi bi-trash"></i></button>
+                </td>
             </tr>`;
         }).join("")}</tbody></table></div>`;
 }
@@ -566,6 +572,64 @@ function viewCustomerDeals(customerName) {
     toggleView("deals");
     document.getElementById("dealStatusFilter").value = "";
     loadDeals(customerName);
+}
+
+function showEditCustomer(name) {
+    const cust = allCustomers.find(c => c.customer_name === name);
+    if (!cust) return;
+    document.getElementById("editCustOriginalName").value = cust.customer_name;
+    document.getElementById("editCustName").value = cust.customer_name;
+    document.getElementById("editCustPhone").value = cust.customer_phone || "";
+    document.getElementById("editCustAddress").value = cust.customer_address || "";
+    new bootstrap.Modal(document.getElementById("editCustomerModal")).show();
+}
+
+async function saveCustomer() {
+    const originalName = document.getElementById("editCustOriginalName").value;
+    const name = document.getElementById("editCustName").value.trim();
+    if (!name) {
+        showToast("Customer name is required", "danger");
+        return;
+    }
+
+    const res = await fetch("/api/customers/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            original_name: originalName,
+            customer_name: name,
+            customer_phone: document.getElementById("editCustPhone").value.trim(),
+            customer_address: document.getElementById("editCustAddress").value.trim()
+        })
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || "Failed to update", "danger");
+        return;
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById("editCustomerModal")).hide();
+    showToast("Customer updated", "success");
+    loadCustomers();
+}
+
+function showDeleteCustomer(name) {
+    document.getElementById("deleteCustName").textContent = name;
+    const modal = new bootstrap.Modal(document.getElementById("deleteCustomerModal"));
+    const btn = document.getElementById("confirmDeleteCustBtn");
+    btn.onclick = async () => {
+        const res = await fetch(`/api/customers/delete?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+        if (res.ok) {
+            modal.hide();
+            showToast("Customer and all deals deleted", "success");
+            loadCustomers();
+            loadPendingCount();
+        } else {
+            showToast("Failed to delete customer", "danger");
+        }
+    };
+    modal.show();
 }
 
 async function loadDeals(customerName = null) {

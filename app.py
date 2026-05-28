@@ -351,6 +351,55 @@ def list_customers():
     return jsonify([row_to_dict(r) for r in rows])
 
 
+@app.route("/api/customers/update", methods=["PUT"])
+def update_customer():
+    data = request.get_json()
+    if not data or not data.get("original_name"):
+        return jsonify({"error": "Original customer name is required"}), 400
+
+    original_name = data["original_name"].strip()
+    new_name = data.get("customer_name", original_name).strip()
+    new_phone = data.get("customer_phone", "").strip()
+    new_address = data.get("customer_address", "").strip()
+
+    if not new_name:
+        return jsonify({"error": "Customer name cannot be empty"}), 400
+
+    conn = get_db()
+    conn.execute(
+        """UPDATE deals SET customer_name = ?, customer_phone = ?,
+           customer_address = ?, updated_at = ?
+           WHERE LOWER(customer_name) = LOWER(?)""",
+        (new_name, new_phone, new_address, now_iso(), original_name),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Customer updated"})
+
+
+@app.route("/api/customers/delete", methods=["DELETE"])
+def delete_customer():
+    name = request.args.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Customer name is required"}), 400
+
+    conn = get_db()
+    deal_ids = [r["id"] for r in conn.execute(
+        "SELECT id FROM deals WHERE LOWER(customer_name) = LOWER(?)", (name,)
+    ).fetchall()]
+
+    if not deal_ids:
+        conn.close()
+        return jsonify({"error": "Customer not found"}), 404
+
+    for did in deal_ids:
+        conn.execute("DELETE FROM deal_items WHERE deal_id = ?", (did,))
+    conn.execute("DELETE FROM deals WHERE LOWER(customer_name) = LOWER(?)", (name,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": f"Customer and {len(deal_ids)} deal(s) deleted"})
+
+
 @app.route("/api/deals", methods=["GET"])
 def list_deals():
     status = request.args.get("status", "").strip()
