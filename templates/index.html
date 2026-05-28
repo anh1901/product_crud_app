@@ -31,6 +31,9 @@
                     <i class="bi bi-clipboard2-check me-1"></i>Deals
                     <span class="badge bg-warning text-dark ms-1" id="pendingCount" style="display:none">0</span>
                 </button>
+                <button class="btn btn-sm nav-tab-btn" id="tabChats" onclick="toggleView('chats')">
+                    <i class="bi bi-chat-dots me-1"></i>Chats
+                </button>
                 <div class="vr mx-2 bg-secondary"></div>
                 <button class="btn btn-warning btn-sm position-relative" onclick="toggleCart()">
                     <i class="bi bi-cart3 me-1"></i>Cart
@@ -166,6 +169,18 @@
                 </select>
             </div>
             <div id="dealsList"></div>
+        </div>
+
+        <!-- Chats View -->
+        <div id="chatsView" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Chats</h4>
+                <div class="input-group" style="max-width:280px">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="chatSearch" placeholder="Search customer..." oninput="renderChatList()">
+                </div>
+            </div>
+            <div id="chatList"></div>
         </div>
     </div>
 

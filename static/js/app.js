@@ -596,8 +596,8 @@ async function submitDeal() {
 }
 
 function toggleView(view) {
-    const views = ["productsView", "shopView", "combosView", "customersView", "dealsView"];
-    const tabs = ["tabProducts", "tabShop", "tabCombos", "tabCustomers", "tabDeals"];
+    const views = ["productsView", "shopView", "combosView", "customersView", "dealsView", "chatsView"];
+    const tabs = ["tabProducts", "tabShop", "tabCombos", "tabCustomers", "tabDeals", "tabChats"];
     views.forEach(v => document.getElementById(v).style.display = "none");
     tabs.forEach(t => document.getElementById(t).classList.remove("active"));
 
@@ -617,11 +617,74 @@ function toggleView(view) {
         document.getElementById("customersView").style.display = "block";
         document.getElementById("tabCustomers").classList.add("active");
         loadCustomers();
+    } else if (view === "chats") {
+        document.getElementById("chatsView").style.display = "block";
+        document.getElementById("tabChats").classList.add("active");
+        loadChatCustomers();
     } else {
         document.getElementById("shopView").style.display = "block";
         document.getElementById("tabShop").classList.add("active");
         applyShopFilters();
     }
+}
+
+// --- Chats ---
+
+let chatCustomers = [];
+
+async function loadChatCustomers() {
+    const res = await fetch("/api/customers");
+    chatCustomers = await res.json();
+    renderChatList();
+}
+
+function renderChatList() {
+    const container = document.getElementById("chatList");
+    const search = (document.getElementById("chatSearch").value || "").trim().toLowerCase();
+
+    let customers = chatCustomers.filter(c => c.customer_phone);
+    if (search) {
+        customers = customers.filter(c =>
+            c.customer_name.toLowerCase().includes(search) ||
+            c.customer_phone.includes(search)
+        );
+    }
+
+    if (customers.length === 0) {
+        container.innerHTML = `<div class="text-center py-5 text-muted">
+            <i class="bi bi-chat-dots fs-1 d-block mb-2"></i>
+            ${chatCustomers.length === 0 ? "No customers yet. Create a deal first!" : "No customers match your search."}
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = `<div class="list-group shadow-sm rounded overflow-hidden">` +
+        customers.map(c => {
+            const initial = c.customer_name.charAt(0).toUpperCase();
+            const color = getPlaceholderColor(c.customer_name);
+            const activeBadge = c.active_deals > 0
+                ? `<span class="badge bg-primary">${c.active_deals} active</span>`
+                : `<span class="badge bg-secondary">no active deals</span>`;
+            return `
+            <div class="list-group-item d-flex align-items-center gap-3 py-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+                     style="width:42px;height:42px;background:${color};font-size:1rem">${initial}</div>
+                <div class="flex-grow-1 min-width-0">
+                    <div class="fw-semibold">${escapeHtml(c.customer_name)}</div>
+                    <div class="small text-muted"><i class="bi bi-telephone me-1"></i>${escapeHtml(c.customer_phone)} ${activeBadge}</div>
+                </div>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <a href="https://zalo.me/${encodeURIComponent(c.customer_phone)}" target="_blank"
+                       class="btn btn-primary btn-sm d-flex align-items-center gap-1">
+                        <i class="bi bi-chat-fill"></i> Zalo
+                    </a>
+                    <a href="tel:${encodeURIComponent(c.customer_phone)}"
+                       class="btn btn-outline-secondary btn-sm" title="Call">
+                        <i class="bi bi-telephone"></i>
+                    </a>
+                </div>
+            </div>`;
+        }).join("") + `</div>`;
 }
 
 // --- Combos ---
