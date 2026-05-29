@@ -34,6 +34,9 @@
                 <button class="btn btn-sm nav-tab-btn" id="tabChats" onclick="toggleView('chats')">
                     <i class="bi bi-chat-dots me-1"></i>Chats
                 </button>
+                <button class="btn btn-sm nav-tab-btn" id="tabCustomTable" onclick="toggleView('customTable')">
+                    <i class="bi bi-tools me-1"></i>Custom Table
+                </button>
                 <div class="vr mx-2 bg-secondary"></div>
                 <button class="btn btn-warning btn-sm position-relative" onclick="toggleCart()">
                     <i class="bi bi-cart3 me-1"></i>Cart
@@ -181,6 +184,189 @@
                 </div>
             </div>
             <div id="chatList"></div>
+        </div>
+
+        <!-- Custom Table View -->
+        <div id="customTableView" style="display:none">
+            <div class="row g-4">
+                <!-- Builder Panel -->
+                <div class="col-lg-7">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Custom Table Builder</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Table Name</label>
+                                <input type="text" class="form-control" id="ctName" placeholder="e.g., Office Desk XL" oninput="calcCustomTable()">
+                            </div>
+                            <hr>
+                            <h6 class="fw-bold"><i class="bi bi-tree me-1"></i> Wood Material</h6>
+                            <div class="row g-2 mb-3">
+                                <div class="col-12">
+                                    <select class="form-select" id="ctWood" onchange="calcCustomTable()">
+                                        <option value="">Select wood type...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <h6 class="fw-bold"><i class="bi bi-rulers me-1"></i> Table Size (cm)</h6>
+                            <div class="row g-2 mb-3">
+                                <div class="col-4">
+                                    <label class="form-label small text-muted">Length</label>
+                                    <input type="number" class="form-control" id="ctLength" min="1" placeholder="120" oninput="calcCustomTable()">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted">Width</label>
+                                    <input type="number" class="form-control" id="ctWidth" min="1" placeholder="60" oninput="calcCustomTable()">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted">Area</label>
+                                    <input type="text" class="form-control" id="ctArea" readonly disabled>
+                                </div>
+                            </div>
+                            <hr>
+                            <h6 class="fw-bold"><i class="bi bi-columns-gap me-1"></i> Table Legs</h6>
+                            <div class="row g-2 mb-3">
+                                <div class="col-8">
+                                    <select class="form-select" id="ctLegs" onchange="calcCustomTable()">
+                                        <option value="">Select leg type...</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted">Qty</label>
+                                    <input type="number" class="form-control" id="ctLegQty" min="0" value="4" oninput="calcCustomTable()">
+                                </div>
+                            </div>
+                            <hr>
+                            <h6 class="fw-bold"><i class="bi bi-plus-circle me-1"></i> Extra Fees</h6>
+                            <div id="ctExtras">
+                                <div class="row g-2 mb-2 ct-extra-row">
+                                    <div class="col">
+                                        <input type="text" class="form-control form-control-sm ct-extra-name" placeholder="e.g., Finishing, Coating...">
+                                    </div>
+                                    <div class="col-4">
+                                        <input type="number" class="form-control form-control-sm ct-extra-price" placeholder="Fee (₫)" min="0" oninput="calcCustomTable()">
+                                    </div>
+                                    <div class="col-auto">
+                                        <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.ct-extra-row').remove();calcCustomTable()"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary mt-1" onclick="addExtraRow()"><i class="bi bi-plus me-1"></i>Add Extra</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary & Settings Panel -->
+                <div class="col-lg-5">
+                    <!-- Price Summary -->
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="bi bi-calculator me-2"></i>Price Summary</h6>
+                        </div>
+                        <div class="card-body" id="ctSummary">
+                            <div class="text-muted text-center py-3">Select wood and size to see pricing</div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-warning w-100" onclick="addCustomTableToCart()">
+                                <i class="bi bi-cart-plus me-1"></i>Add to Cart
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Manage Wood Types -->
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-tree me-2"></i>Wood Types</h6>
+                            <button class="btn btn-sm btn-success" onclick="showWoodModal()"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush" id="woodTypeList"></div>
+                        </div>
+                    </div>
+
+                    <!-- Manage Leg Types -->
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-columns-gap me-2"></i>Leg Types</h6>
+                            <button class="btn btn-sm btn-success" onclick="showLegModal()"><i class="bi bi-plus-lg"></i></button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush" id="legTypeList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wood Type Modal -->
+    <div class="modal fade" id="woodModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title" id="woodModalTitle">Add Wood Type</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="woodId">
+                    <div class="mb-2">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="woodName" placeholder="e.g., Oak, Walnut">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Price per m² (₫)</label>
+                        <input type="number" class="form-control" id="woodPrice" min="0" step="1000">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Cost per m² (₫)</label>
+                        <input type="number" class="form-control" id="woodCost" min="0" step="1000">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" id="woodDesc">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary btn-sm" onclick="saveWoodType()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leg Type Modal -->
+    <div class="modal fade" id="legModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title" id="legModalTitle">Add Leg Type</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="legId">
+                    <div class="mb-2">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="legName" placeholder="e.g., Hairpin, Tapered">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Price per leg (₫)</label>
+                        <input type="number" class="form-control" id="legPrice" min="0" step="1000">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Cost per leg (₫)</label>
+                        <input type="number" class="form-control" id="legCostPrice" min="0" step="1000">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" id="legDesc">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary btn-sm" onclick="saveLegType()">Save</button>
+                </div>
+            </div>
         </div>
     </div>
 

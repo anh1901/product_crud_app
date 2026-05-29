@@ -596,8 +596,8 @@ async function submitDeal() {
 }
 
 function toggleView(view) {
-    const views = ["productsView", "shopView", "combosView", "customersView", "dealsView", "chatsView"];
-    const tabs = ["tabProducts", "tabShop", "tabCombos", "tabCustomers", "tabDeals", "tabChats"];
+    const views = ["productsView", "shopView", "combosView", "customersView", "dealsView", "chatsView", "customTableView"];
+    const tabs = ["tabProducts", "tabShop", "tabCombos", "tabCustomers", "tabDeals", "tabChats", "tabCustomTable"];
     views.forEach(v => document.getElementById(v).style.display = "none");
     tabs.forEach(t => document.getElementById(t).classList.remove("active"));
 
@@ -621,6 +621,10 @@ function toggleView(view) {
         document.getElementById("chatsView").style.display = "block";
         document.getElementById("tabChats").classList.add("active");
         loadChatCustomers();
+    } else if (view === "customTable") {
+        document.getElementById("customTableView").style.display = "block";
+        document.getElementById("tabCustomTable").classList.add("active");
+        loadCustomTableData();
     } else {
         document.getElementById("shopView").style.display = "block";
         document.getElementById("tabShop").classList.add("active");
@@ -685,6 +689,285 @@ function renderChatList() {
                 </div>
             </div>`;
         }).join("") + `</div>`;
+}
+
+// --- Custom Table Builder ---
+
+let woodTypes = [];
+let legTypes = [];
+
+async function loadCustomTableData() {
+    const [wRes, lRes] = await Promise.all([
+        fetch("/api/wood-types"),
+        fetch("/api/leg-types")
+    ]);
+    woodTypes = await wRes.json();
+    legTypes = await lRes.json();
+    populateCustomTableSelects();
+    renderWoodTypeList();
+    renderLegTypeList();
+}
+
+function populateCustomTableSelects() {
+    const ws = document.getElementById("ctWood");
+    const currentW = ws.value;
+    ws.innerHTML = '<option value="">Select wood type...</option>' +
+        woodTypes.map(w => `<option value="${w.id}" data-price="${w.price_per_m2}" data-cost="${w.cost_per_m2}">${escapeHtml(w.name)} — ${formatVND(w.price_per_m2)}/m²</option>`).join("");
+    if (currentW) ws.value = currentW;
+
+    const ls = document.getElementById("ctLegs");
+    const currentL = ls.value;
+    ls.innerHTML = '<option value="">No legs</option>' +
+        legTypes.map(l => `<option value="${l.id}" data-price="${l.price}" data-cost="${l.cost_price}">${escapeHtml(l.name)} — ${formatVND(l.price)}/leg</option>`).join("");
+    if (currentL) ls.value = currentL;
+}
+
+function addExtraRow() {
+    const container = document.getElementById("ctExtras");
+    const row = document.createElement("div");
+    row.className = "row g-2 mb-2 ct-extra-row";
+    row.innerHTML = `
+        <div class="col">
+            <input type="text" class="form-control form-control-sm ct-extra-name" placeholder="e.g., Finishing, Coating...">
+        </div>
+        <div class="col-4">
+            <input type="number" class="form-control form-control-sm ct-extra-price" placeholder="Fee (₫)" min="0" oninput="calcCustomTable()">
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.ct-extra-row').remove();calcCustomTable()"><i class="bi bi-x-lg"></i></button>
+        </div>`;
+    container.appendChild(row);
+}
+
+function calcCustomTable() {
+    const summary = document.getElementById("ctSummary");
+    const length = parseFloat(document.getElementById("ctLength").value) || 0;
+    const width = parseFloat(document.getElementById("ctWidth").value) || 0;
+    const areaM2 = (length * width) / 10000;
+    document.getElementById("ctArea").value = areaM2 > 0 ? `${areaM2.toFixed(4)} m²` : "";
+
+    const ws = document.getElementById("ctWood");
+    const wOpt = ws.options[ws.selectedIndex];
+    const woodPriceM2 = ws.value ? parseFloat(wOpt.dataset.price) : 0;
+    const woodCostM2 = ws.value ? parseFloat(wOpt.dataset.cost) : 0;
+    const woodPrice = woodPriceM2 * areaM2;
+    const woodCost = woodCostM2 * areaM2;
+
+    const ls = document.getElementById("ctLegs");
+    const lOpt = ls.options[ls.selectedIndex];
+    const legQty = parseInt(document.getElementById("ctLegQty").value) || 0;
+    const legPriceEach = ls.value ? parseFloat(lOpt.dataset.price) : 0;
+    const legCostEach = ls.value ? parseFloat(lOpt.dataset.cost) : 0;
+    const legsPrice = legPriceEach * legQty;
+    const legsCost = legCostEach * legQty;
+
+    let extrasTotal = 0;
+    let extrasHtml = "";
+    document.querySelectorAll(".ct-extra-row").forEach(row => {
+        const name = row.querySelector(".ct-extra-name").value.trim() || "Extra";
+        const price = parseFloat(row.querySelector(".ct-extra-price").value) || 0;
+        if (price > 0) {
+            extrasTotal += price;
+            extrasHtml += `<div class="d-flex justify-content-between"><span class="text-muted">${escapeHtml(name)}</span><span>${formatVND(price)}</span></div>`;
+        }
+    });
+
+    const total = woodPrice + legsPrice + extrasTotal;
+    const costTotal = woodCost + legsCost;
+    const profit = total - costTotal;
+
+    if (!ws.value || areaM2 === 0) {
+        summary.innerHTML = `<div class="text-muted text-center py-3">Select wood and enter size to see pricing</div>`;
+        return;
+    }
+
+    summary.innerHTML = `
+        <div class="d-flex justify-content-between mb-1">
+            <span><i class="bi bi-tree me-1"></i>${escapeHtml(wOpt.text.split(" —")[0])}</span>
+            <span class="fw-semibold">${formatVND(woodPrice)}</span>
+        </div>
+        <div class="small text-muted mb-2">${length}×${width}cm = ${areaM2.toFixed(4)}m² × ${formatVND(woodPriceM2)}/m²</div>
+        ${ls.value && legQty > 0 ? `<div class="d-flex justify-content-between mb-1">
+            <span><i class="bi bi-columns-gap me-1"></i>${escapeHtml(lOpt.text.split(" —")[0])} ×${legQty}</span>
+            <span class="fw-semibold">${formatVND(legsPrice)}</span>
+        </div>` : ""}
+        ${extrasHtml ? `<hr class="my-2">${extrasHtml}` : ""}
+        <hr class="my-2">
+        <div class="d-flex justify-content-between fs-5 fw-bold">
+            <span>Total</span>
+            <span class="text-success">${formatVND(total)}</span>
+        </div>
+        <div class="d-flex justify-content-between small mt-1 ${profit >= 0 ? 'text-success' : 'text-danger'}">
+            <span>Profit</span>
+            <span>${formatVND(profit)}</span>
+        </div>`;
+}
+
+function addCustomTableToCart() {
+    const name = document.getElementById("ctName").value.trim() || "Custom Table";
+    const length = parseFloat(document.getElementById("ctLength").value) || 0;
+    const width = parseFloat(document.getElementById("ctWidth").value) || 0;
+    const ws = document.getElementById("ctWood");
+    if (!ws.value || length === 0 || width === 0) {
+        showToast("Select wood type and enter size first", "danger");
+        return;
+    }
+
+    const areaM2 = (length * width) / 10000;
+    const wOpt = ws.options[ws.selectedIndex];
+    const woodPrice = parseFloat(wOpt.dataset.price) * areaM2;
+    const woodCost = parseFloat(wOpt.dataset.cost) * areaM2;
+
+    const ls = document.getElementById("ctLegs");
+    const lOpt = ls.options[ls.selectedIndex];
+    const legQty = parseInt(document.getElementById("ctLegQty").value) || 0;
+    const legsPrice = ls.value ? parseFloat(lOpt.dataset.price) * legQty : 0;
+    const legsCost = ls.value ? parseFloat(lOpt.dataset.cost) * legQty : 0;
+
+    let extrasTotal = 0;
+    document.querySelectorAll(".ct-extra-row").forEach(row => {
+        extrasTotal += parseFloat(row.querySelector(".ct-extra-price").value) || 0;
+    });
+
+    const total = woodPrice + legsPrice + extrasTotal;
+    const costTotal = woodCost + legsCost;
+    const cartId = `custom_${Date.now()}`;
+
+    cart.push({
+        id: cartId,
+        name: `[CUSTOM] ${name} (${length}×${width}cm)`,
+        price: total,
+        cost_price: costTotal,
+        qty: 1
+    });
+    renderCart();
+    showToast(`Custom table "${name}" added to cart`, "success");
+}
+
+// --- Wood & Leg Type Management ---
+
+function renderWoodTypeList() {
+    const list = document.getElementById("woodTypeList");
+    if (woodTypes.length === 0) {
+        list.innerHTML = `<div class="list-group-item text-center text-muted small py-3">No wood types yet</div>`;
+        return;
+    }
+    list.innerHTML = woodTypes.map(w => `
+        <div class="list-group-item d-flex align-items-center justify-content-between py-2">
+            <div>
+                <div class="fw-semibold small">${escapeHtml(w.name)}</div>
+                <div class="text-muted" style="font-size:0.75rem">${formatVND(w.price_per_m2)}/m² | Cost: ${formatVND(w.cost_per_m2)}/m²</div>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-primary border-0 p-1" onclick="showWoodModal('${w.id}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger border-0 p-1" onclick="deleteWoodType('${w.id}')"><i class="bi bi-trash"></i></button>
+            </div>
+        </div>`).join("");
+}
+
+function renderLegTypeList() {
+    const list = document.getElementById("legTypeList");
+    if (legTypes.length === 0) {
+        list.innerHTML = `<div class="list-group-item text-center text-muted small py-3">No leg types yet</div>`;
+        return;
+    }
+    list.innerHTML = legTypes.map(l => `
+        <div class="list-group-item d-flex align-items-center justify-content-between py-2">
+            <div>
+                <div class="fw-semibold small">${escapeHtml(l.name)}</div>
+                <div class="text-muted" style="font-size:0.75rem">${formatVND(l.price)}/leg | Cost: ${formatVND(l.cost_price)}/leg</div>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-primary border-0 p-1" onclick="showLegModal('${l.id}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger border-0 p-1" onclick="deleteLegType('${l.id}')"><i class="bi bi-trash"></i></button>
+            </div>
+        </div>`).join("");
+}
+
+function showWoodModal(id = null) {
+    document.getElementById("woodModalTitle").textContent = id ? "Edit Wood Type" : "Add Wood Type";
+    document.getElementById("woodId").value = id || "";
+    document.getElementById("woodName").value = "";
+    document.getElementById("woodPrice").value = "";
+    document.getElementById("woodCost").value = "";
+    document.getElementById("woodDesc").value = "";
+    if (id) {
+        const w = woodTypes.find(x => x.id === id);
+        if (w) {
+            document.getElementById("woodName").value = w.name;
+            document.getElementById("woodPrice").value = w.price_per_m2;
+            document.getElementById("woodCost").value = w.cost_per_m2;
+            document.getElementById("woodDesc").value = w.description || "";
+        }
+    }
+    new bootstrap.Modal(document.getElementById("woodModal")).show();
+}
+
+async function saveWoodType() {
+    const id = document.getElementById("woodId").value;
+    const body = {
+        name: document.getElementById("woodName").value.trim(),
+        price_per_m2: parseFloat(document.getElementById("woodPrice").value) || 0,
+        cost_per_m2: parseFloat(document.getElementById("woodCost").value) || 0,
+        description: document.getElementById("woodDesc").value.trim()
+    };
+    if (!body.name) { showToast("Name is required", "danger"); return; }
+    const url = id ? `/api/wood-types/${id}` : "/api/wood-types";
+    const method = id ? "PUT" : "POST";
+    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    bootstrap.Modal.getInstance(document.getElementById("woodModal")).hide();
+    showToast(id ? "Wood type updated" : "Wood type added", "success");
+    loadCustomTableData();
+}
+
+async function deleteWoodType(id) {
+    if (!confirm("Delete this wood type?")) return;
+    await fetch(`/api/wood-types/${id}`, { method: "DELETE" });
+    showToast("Wood type deleted", "success");
+    loadCustomTableData();
+}
+
+function showLegModal(id = null) {
+    document.getElementById("legModalTitle").textContent = id ? "Edit Leg Type" : "Add Leg Type";
+    document.getElementById("legId").value = id || "";
+    document.getElementById("legName").value = "";
+    document.getElementById("legPrice").value = "";
+    document.getElementById("legCostPrice").value = "";
+    document.getElementById("legDesc").value = "";
+    if (id) {
+        const l = legTypes.find(x => x.id === id);
+        if (l) {
+            document.getElementById("legName").value = l.name;
+            document.getElementById("legPrice").value = l.price;
+            document.getElementById("legCostPrice").value = l.cost_price;
+            document.getElementById("legDesc").value = l.description || "";
+        }
+    }
+    new bootstrap.Modal(document.getElementById("legModal")).show();
+}
+
+async function saveLegType() {
+    const id = document.getElementById("legId").value;
+    const body = {
+        name: document.getElementById("legName").value.trim(),
+        price: parseFloat(document.getElementById("legPrice").value) || 0,
+        cost_price: parseFloat(document.getElementById("legCostPrice").value) || 0,
+        description: document.getElementById("legDesc").value.trim()
+    };
+    if (!body.name) { showToast("Name is required", "danger"); return; }
+    const url = id ? `/api/leg-types/${id}` : "/api/leg-types";
+    const method = id ? "PUT" : "POST";
+    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    bootstrap.Modal.getInstance(document.getElementById("legModal")).hide();
+    showToast(id ? "Leg type updated" : "Leg type added", "success");
+    loadCustomTableData();
+}
+
+async function deleteLegType(id) {
+    if (!confirm("Delete this leg type?")) return;
+    await fetch(`/api/leg-types/${id}`, { method: "DELETE" });
+    showToast("Leg type deleted", "success");
+    loadCustomTableData();
 }
 
 // --- Combos ---

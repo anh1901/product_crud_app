@@ -99,6 +99,28 @@ def init_db():
         )
     """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wood_types (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            price_per_m2 REAL NOT NULL,
+            cost_per_m2 REAL DEFAULT 0,
+            description TEXT DEFAULT ''
+        )
+    """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS leg_types (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            price REAL NOT NULL,
+            cost_price REAL DEFAULT 0,
+            description TEXT DEFAULT ''
+        )
+    """
+    )
     # Migrate: add shipping_fee column if missing
     deal_cols = [row[1] for row in conn.execute("PRAGMA table_info(deals)").fetchall()]
     if "shipping_fee" not in deal_cols:
@@ -363,6 +385,110 @@ def import_products():
             "products": imported,
         }
     ), 201 if imported else 400
+
+
+# --- Wood Types ---
+
+@app.route("/api/wood-types", methods=["GET"])
+def list_wood_types():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM wood_types ORDER BY name").fetchall()
+    conn.close()
+    return jsonify([row_to_dict(r) for r in rows])
+
+
+@app.route("/api/wood-types", methods=["POST"])
+def create_wood_type():
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "Wood type name is required"}), 400
+    wid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO wood_types (id, name, price_per_m2, cost_per_m2, description) VALUES (?, ?, ?, ?, ?)",
+        (wid, data["name"].strip(), float(data.get("price_per_m2", 0)),
+         float(data.get("cost_per_m2", 0)), data.get("description", "").strip()),
+    )
+    conn.commit()
+    row = row_to_dict(conn.execute("SELECT * FROM wood_types WHERE id = ?", (wid,)).fetchone())
+    conn.close()
+    return jsonify(row), 201
+
+
+@app.route("/api/wood-types/<wid>", methods=["PUT"])
+def update_wood_type(wid):
+    data = request.get_json()
+    conn = get_db()
+    conn.execute(
+        "UPDATE wood_types SET name = ?, price_per_m2 = ?, cost_per_m2 = ?, description = ? WHERE id = ?",
+        (data["name"].strip(), float(data.get("price_per_m2", 0)),
+         float(data.get("cost_per_m2", 0)), data.get("description", "").strip(), wid),
+    )
+    conn.commit()
+    row = row_to_dict(conn.execute("SELECT * FROM wood_types WHERE id = ?", (wid,)).fetchone())
+    conn.close()
+    return jsonify(row)
+
+
+@app.route("/api/wood-types/<wid>", methods=["DELETE"])
+def delete_wood_type(wid):
+    conn = get_db()
+    conn.execute("DELETE FROM wood_types WHERE id = ?", (wid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Wood type deleted"})
+
+
+# --- Leg Types ---
+
+@app.route("/api/leg-types", methods=["GET"])
+def list_leg_types():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM leg_types ORDER BY name").fetchall()
+    conn.close()
+    return jsonify([row_to_dict(r) for r in rows])
+
+
+@app.route("/api/leg-types", methods=["POST"])
+def create_leg_type():
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "Leg type name is required"}), 400
+    lid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO leg_types (id, name, price, cost_price, description) VALUES (?, ?, ?, ?, ?)",
+        (lid, data["name"].strip(), float(data.get("price", 0)),
+         float(data.get("cost_price", 0)), data.get("description", "").strip()),
+    )
+    conn.commit()
+    row = row_to_dict(conn.execute("SELECT * FROM leg_types WHERE id = ?", (lid,)).fetchone())
+    conn.close()
+    return jsonify(row), 201
+
+
+@app.route("/api/leg-types/<lid>", methods=["PUT"])
+def update_leg_type(lid):
+    data = request.get_json()
+    conn = get_db()
+    conn.execute(
+        "UPDATE leg_types SET name = ?, price = ?, cost_price = ?, description = ? WHERE id = ?",
+        (data["name"].strip(), float(data.get("price", 0)),
+         float(data.get("cost_price", 0)), data.get("description", "").strip(), lid),
+    )
+    conn.commit()
+    row = row_to_dict(conn.execute("SELECT * FROM leg_types WHERE id = ?", (lid,)).fetchone())
+    conn.close()
+    return jsonify(row)
+
+
+@app.route("/api/leg-types/<lid>", methods=["DELETE"])
+def delete_leg_type(lid):
+    conn = get_db()
+    conn.execute("DELETE FROM leg_types WHERE id = ?", (lid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Leg type deleted"})
 
 
 # --- Combos ---
