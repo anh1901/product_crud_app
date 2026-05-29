@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Table Deals</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar (desktop) -->
+    <nav class="sidebar">
+      <div class="sidebar-brand">
+        Custom Table Deals
+        <small>Price Calculator & Orders</small>
+      </div>
+      <ul class="sidebar-nav">
+        <li data-page="calculator" class="active">
+          <span class="nav-icon">🧮</span> Calculator
+        </li>
+        <li data-page="deals">
+          <span class="nav-icon">📋</span> Deals
+        </li>
+        <li data-page="customers">
+          <span class="nav-icon">👥</span> Customers
+        </li>
+        <li data-page="wood">
+          <span class="nav-icon">🪵</span> Wood Types
+        </li>
+        <li data-page="legs">
+          <span class="nav-icon">🦿</span> Leg Types
+        </li>
+        <li data-page="chairs">
+          <span class="nav-icon">🪑</span> Chair Types
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+      <div class="empty-state">
+        <div class="icon">⏳</div>
+        <p>Loading...</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="mobile-nav">
+    <div class="nav-item active" data-page="calculator">
+      <span class="nav-icon">🧮</span>
+      Calc
+    </div>
+    <div class="nav-item" data-page="deals">
+      <span class="nav-icon">📋</span>
+      Deals
+    </div>
+    <div class="nav-item" data-page="customers">
+      <span class="nav-icon">👥</span>
+      Customers
+    </div>
+    <div class="nav-item" data-page="wood">
+      <span class="nav-icon">🪵</span>
+      Wood
+    </div>
+    <div class="nav-item" data-page="legs">
+      <span class="nav-icon">🦿</span>
+      Legs
+    </div>
+    <div class="nav-item" data-page="chairs">
+      <span class="nav-icon">🪑</span>
+      Chairs
+    </div>
+  </nav>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay" id="modal-overlay"></div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,62 +1,53 @@
-# Product CRUD App
+# Custom Table Deals
 
-A simple Flutter mobile app for managing products with full CRUD (Create, Read, Update, Delete) functionality.
+A web app for calculating custom table prices and managing customer deals.
 
 ## Features
 
-- **Create** products with name, price, description, and image
-- **Read** product list and detailed product view
-- **Update** existing product information
-- **Delete** products with confirmation dialog
-- Image picking from camera or gallery
-- Local SQLite database for persistent storage
-- Material 3 design with pull-to-refresh
+- **Price Calculator**: Configure table dimensions, wood type, legs, chairs, extra fees, and shipping to get an instant price breakdown
+- **Deal Management**: Save deals with customer info, track status (pending, on delivery, success, returning, fail)
+- **Component CRUD**: Manage wood types, leg types, and chair types with prices
+- **Customer View**: See all customers derived from deals with total spending stats
+- **Dashboard Stats**: Overview of deal counts by status and total revenue
+- **Responsive**: Works on desktop and mobile
 
 ## Tech Stack
 
-- **Flutter** 3.44+ / Dart 3.12+
-- **sqflite** — SQLite database for local persistence
-- **image_picker** — Camera and gallery image selection
-- **uuid** — Unique ID generation for products
-- **intl** — Number/currency formatting
-
-## Project Structure
-
-```
-lib/
-├── main.dart                     # App entry point and theme
-├── models/
-│   └── product.dart              # Product data model
-├── helpers/
-│   └── database_helper.dart      # SQLite database operations
-└── screens/
-    ├── product_list_screen.dart   # Product listing with search
-    ├── product_detail_screen.dart # Product detail view
-    └── product_form_screen.dart   # Add/Edit product form
-```
+- **Flask** (Python) — Backend API + server-rendered template
+- **SQLite** — Local database
+- **Vanilla JS** — Single-page app frontend
+- **CSS** — Custom responsive design
 
 ## Getting Started
 
 ### Prerequisites
 
-- Flutter SDK 3.44+
-- Android Studio / Xcode (for emulators)
+- Python 3.10+
 
-### Run the app
-
-```bash
-flutter pub get
-flutter run
-```
-
-### Run tests
+### Install & Run
 
 ```bash
-flutter test
+pip install -r requirements.txt
+python app.py
 ```
 
-### Analyze
+Open http://localhost:5000 in your browser.
 
-```bash
-flutter analyze
-```
+## API Endpoints
+
+### Components
+- `GET/POST /api/wood-types` — List / create wood types
+- `PUT/DELETE /api/wood-types/<id>` — Update / delete wood type
+- `GET/POST /api/leg-types` — List / create leg types
+- `PUT/DELETE /api/leg-types/<id>` — Update / delete leg type
+- `GET/POST /api/chair-types` — List / create chair types
+- `PUT/DELETE /api/chair-types/<id>` — Update / delete chair type
+
+### Deals
+- `GET/POST /api/deals` — List (filter by `?status=`) / create deal
+- `GET/PUT/DELETE /api/deals/<id>` — Get / update / delete deal
+- `PUT /api/deals/<id>/status` — Update deal status
+
+### Other
+- `GET /api/stats` — Dashboard statistics
+- `GET /api/customers` — Customer list (derived from deals)
