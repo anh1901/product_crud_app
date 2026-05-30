@@ -1018,9 +1018,79 @@ def delete_combo(combo_id):
     return jsonify({"message": "Combo deleted"})
 
 
+# ============================================================
+#  AI API
+# ============================================================
+
+from ai_service import generate_description, suggest_category, suggest_price, sales_assistant
+
+
+@app.route("/api/ai/generate-description", methods=["POST"])
+def ai_generate_description():
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "Product name is required"}), 400
+    result = generate_description(
+        name=data["name"],
+        category=data.get("category", ""),
+        size=data.get("size", ""),
+        color=data.get("color", ""),
+    )
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify(result)
+
+
+@app.route("/api/ai/suggest-category", methods=["POST"])
+def ai_suggest_category():
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "Product name is required"}), 400
+    conn = get_db()
+    cats = [row["name"] for row in conn.execute("SELECT name FROM categories").fetchall()]
+    conn.close()
+    result = suggest_category(name=data["name"], existing_categories=cats)
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify(result)
+
+
+@app.route("/api/ai/suggest-price", methods=["POST"])
+def ai_suggest_price():
+    data = request.get_json()
+    if not data or not data.get("name"):
+        return jsonify({"error": "Product name is required"}), 400
+    conn = get_db()
+    prices = [row["price"] for row in conn.execute("SELECT price FROM products LIMIT 20").fetchall()]
+    conn.close()
+    result = suggest_price(
+        name=data["name"],
+        cost_price=float(data.get("cost_price", 0)),
+        category=data.get("category", ""),
+        existing_prices=prices,
+    )
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify(result)
+
+
+@app.route("/api/ai/sales-assistant", methods=["POST"])
+def ai_sales_assistant():
+    data = request.get_json()
+    if not data or not data.get("message"):
+        return jsonify({"error": "Message is required"}), 400
+    conn = get_db()
+    products = [dict(row) for row in conn.execute("SELECT name, category, price FROM products LIMIT 30").fetchall()]
+    conn.close()
+    result = sales_assistant(message=data["message"], products=products)
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify(result)
+
+
 # Initialize DB on import (needed for Render/gunicorn)
 with app.app_context():
     init_db()
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=8080)

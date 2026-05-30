@@ -773,7 +773,6 @@ async function deleteCombo(id) {
 // ===== CUSTOM TABLE (BAO GIA) =====
 const PAINT_FEE = 500000;
 const WIDTH_PRICING = { 60: 55000000, 70: 80000000, 75: 85000000, 80: 90000000, 90: 100000000, 100: 110000000 };
-const READY_MADE_DISCOUNT = 0.85;
 let allCategories = [];
 
 function getUnitPriceByWidth(widthCm) {
@@ -855,15 +854,12 @@ function calcCustomTable() {
     const l = parseFloat(document.getElementById("ctLength").value) || 0;
     const w = parseFloat(document.getElementById("ctWidth").value) || 0;
     const t = parseFloat(document.getElementById("ctThickness").value) || 0;
-    const isReadyMade = document.getElementById("ctReadyMade").checked;
     const volumeM3 = (l / 100) * (w / 100) * (t / 100);
     document.getElementById("ctVolume").value = volumeM3 > 0 ? `${volumeM3.toFixed(6)} m³` : "";
 
     const unitPrice = w > 0 ? getUnitPriceByWidth(w) : 0;
     const tablePrice = volumeM3 * unitPrice;
-    const paintFee = isReadyMade ? 0 : PAINT_FEE;
-    const discount = isReadyMade ? tablePrice * (1 - READY_MADE_DISCOUNT) : 0;
-    const tableAfterDiscount = tablePrice - discount;
+    const paintFee = parseFloat(document.getElementById("ctPaintFee").value) || 0;
 
     const ls = document.getElementById("ctLegs"); const lo = ls.options[ls.selectedIndex];
     const lq = parseInt(document.getElementById("ctLegQty").value) || 0;
@@ -881,7 +877,7 @@ function calcCustomTable() {
         if (p > 0) { extras += p; extrasHtml += `<div class="d-flex justify-content-between"><span class="text-muted">${escapeHtml(n)}</span><span>${formatVND(p)}</span></div>`; }
     });
 
-    const total = tableAfterDiscount + paintFee + legPrice + chairsTotal + extras;
+    const total = tablePrice + paintFee + legPrice + chairsTotal + extras;
     const costTotal = legCost + chairsCost;
     const profit = total - costTotal;
 
@@ -894,8 +890,7 @@ function calcCustomTable() {
         <div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">Thể tích</span><span class="fw-600">${volumeM3.toFixed(6)} m³</span></div>
         <div class="text-muted mb-2" style="font-size:.72rem">${l}×${w}×${t}cm · Đơn giá ${formatVND(unitPrice)}/m³</div>
         <div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">Bàn gỗ</span><span class="fw-600">${formatVND(tablePrice)}</span></div>`;
-    if (isReadyMade) html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem;color:var(--danger)">Giảm bàn có sẵn (-15%)</span><span class="text-danger fw-600">-${formatVND(discount)}</span></div>`;
-    if (!isReadyMade) html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">Phí sơn</span><span class="fw-600">${formatVND(paintFee)}</span></div>`;
+    if (paintFee > 0) html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">Phí sơn</span><span class="fw-600">${formatVND(paintFee)}</span></div>`;
     if (legPrice > 0) html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">${escapeHtml(lo.text.split(" —")[0])} ×${lq}</span><span class="fw-600">${formatVND(legPrice)}</span></div>`;
     chairs.forEach(c => { html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">${escapeHtml(c.name)} ×${c.qty}</span><span class="fw-600">${formatVND(c.price * c.qty)}</span></div>`; });
     if (extrasHtml) html += `<hr class="my-1">${extrasHtml}`;
@@ -903,7 +898,6 @@ function calcCustomTable() {
         <hr class="my-1">
         <div class="d-flex justify-content-between"><span class="fw-bold">TỔNG CỘNG</span><span class="fw-bold text-success" style="font-size:1.1rem">${formatVND(total)}</span></div>
         <div class="d-flex justify-content-between" style="font-size:.78rem"><span class="text-muted">Lợi nhuận</span><span class="${profit >= 0 ? "text-success" : "text-danger"} fw-600">${formatVND(profit)}</span></div>`;
-    if (isReadyMade) html += `<div class="mt-2 p-2 rounded" style="background:var(--warning-bg);font-size:.75rem"><i class="bi bi-info-circle me-1"></i>Bàn có sẵn: miễn phí sơn, giảm 15%</div>`;
     summary.innerHTML = html;
 }
 
@@ -914,12 +908,10 @@ function addCustomTableToCart() {
     const t = parseFloat(document.getElementById("ctThickness").value) || 0;
     if (l === 0 || w === 0 || t === 0) { showToast("Nhập đầy đủ kích thước (dài, rộng, dày)", "danger"); return; }
 
-    const isReadyMade = document.getElementById("ctReadyMade").checked;
     const volumeM3 = (l / 100) * (w / 100) * (t / 100);
     const unitPrice = getUnitPriceByWidth(w);
     const tablePrice = volumeM3 * unitPrice;
-    const discount = isReadyMade ? tablePrice * (1 - READY_MADE_DISCOUNT) : 0;
-    const paintFee = isReadyMade ? 0 : PAINT_FEE;
+    const paintFee = parseFloat(document.getElementById("ctPaintFee").value) || 0;
 
     const ls = document.getElementById("ctLegs"); const lo = ls.options[ls.selectedIndex];
     const lq = parseInt(document.getElementById("ctLegQty").value) || 0;
@@ -939,20 +931,19 @@ function addCustomTableToCart() {
         if (p > 0) { extras += p; extrasList.push({ name: n, price: p }); }
     });
 
-    const total = (tablePrice - discount) + paintFee + legPrice + chairsTotal + extras;
+    const total = tablePrice + paintFee + legPrice + chairsTotal + extras;
     const costTotal = legCost + chairsCost;
-    const tag = isReadyMade ? "CÓ SẴN" : "TÙY CHỈNH";
 
     const details = [];
     details.push(`Kích thước: ${l}×${w}×${t}cm`);
     if (legName && lq > 0) details.push(`Chân: ${legName} ×${lq}`);
     chairs.forEach(c => details.push(`Ghế: ${c.name} ×${c.qty}`));
     extrasList.forEach(e => details.push(`${e.name}: ${formatVND(e.price)}`));
-    if (isReadyMade) details.push("Bàn có sẵn: miễn sơn, giảm 15%");
+    if (paintFee > 0) details.push(`Phí sơn: ${formatVND(paintFee)}`);
 
     cart.push({
         id: `custom_${Date.now()}`,
-        name: `[${tag}] ${name}`,
+        name: name,
         price: total,
         cost_price: costTotal,
         qty: 1,
@@ -1026,4 +1017,240 @@ function showToast(msg, type = "success") {
     t.className = `toast bg-${type} text-white`;
     b.innerHTML = `<i class="bi ${icon} me-2"></i>${msg}`;
     new bootstrap.Toast(t, { delay: 3000 }).show();
+}
+
+// ===== AI FEATURES =====
+function setAiLoading(btn, loading) {
+    if (loading) {
+        btn.classList.add("btn-ai-loading");
+        btn.dataset.originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+    } else {
+        btn.classList.remove("btn-ai-loading");
+        if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
+    }
+}
+
+async function aiGenerateDescription() {
+    const btn = event.currentTarget;
+    const name = document.getElementById("productName").value.trim();
+    if (!name) { showToast("Nhập tên sản phẩm trước", "danger"); return; }
+    setAiLoading(btn, true);
+    try {
+        const res = await fetch("/api/ai/generate-description", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name,
+                category: document.getElementById("productCategory").value,
+                size: document.getElementById("productSize").value,
+                color: document.getElementById("productColor").value,
+            })
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, "danger"); return; }
+        document.getElementById("productDescription").value = data.description;
+        showToast("Đã tạo mô tả bằng AI", "success");
+    } catch (e) {
+        showToast("Lỗi kết nối AI. Đảm bảo Ollama đang chạy.", "danger");
+    } finally {
+        setAiLoading(btn, false);
+    }
+}
+
+async function aiSuggestCategory() {
+    const btn = event.currentTarget;
+    const name = document.getElementById("productName").value.trim();
+    if (!name) { showToast("Nhập tên sản phẩm trước", "danger"); return; }
+    setAiLoading(btn, true);
+    try {
+        const res = await fetch("/api/ai/suggest-category", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, "danger"); return; }
+        const sel = document.getElementById("productCategory");
+        const cat = data.category;
+        let found = false;
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === cat) { sel.selectedIndex = i; found = true; break; }
+        }
+        if (!found && cat) {
+            const opt = document.createElement("option");
+            opt.value = cat; opt.textContent = cat;
+            sel.appendChild(opt);
+            sel.value = cat;
+        }
+        showToast(`AI gợi ý danh mục: "${cat}"`, "success");
+    } catch (e) {
+        showToast("Lỗi kết nối AI. Đảm bảo Ollama đang chạy.", "danger");
+    } finally {
+        setAiLoading(btn, false);
+    }
+}
+
+async function aiSuggestPrice() {
+    const btn = event.currentTarget;
+    const name = document.getElementById("productName").value.trim();
+    if (!name) { showToast("Nhập tên sản phẩm trước", "danger"); return; }
+    setAiLoading(btn, true);
+    try {
+        const res = await fetch("/api/ai/suggest-price", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name,
+                cost_price: parseFloat(document.getElementById("productCostPrice").value) || 0,
+                category: document.getElementById("productCategory").value,
+            })
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, "danger"); return; }
+        document.getElementById("productPrice").value = data.price;
+        showToast(`AI gợi ý giá: ${formatVND(data.price)}`, "success");
+    } catch (e) {
+        showToast("Lỗi kết nối AI. Đảm bảo Ollama đang chạy.", "danger");
+    } finally {
+        setAiLoading(btn, false);
+    }
+}
+
+async function applyShopFilters() {
+    const search = (document.getElementById("shopSearch")?.value || "").trim().toLowerCase();
+    const category = document.getElementById("shopCategoryFilter")?.value || "";
+    let filtered = allProducts.filter(p => {
+        if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search)) return false;
+        if (category && p.category !== category) return false;
+        return true;
+    });
+
+    let comboHtml = "";
+    let filteredCombos = allCombos;
+    if (search) filteredCombos = allCombos.filter(c => c.name.toLowerCase().includes(search) || c.items.some(i => i.product_name.toLowerCase().includes(search)));
+    if (filteredCombos.length > 0) {
+        comboHtml = `<div class="shop-cat-section">
+            <div class="shop-cat-header" onclick="toggleShopCat(this)">
+                <span class="cat-title"><i class="bi bi-box-seam"></i>Gói sản phẩm <span class="cat-count">${filteredCombos.length}</span></span>
+                <i class="bi bi-chevron-down cat-toggle"></i>
+            </div>
+            <div class="shop-cat-body">${filteredCombos.map(c => renderComboCard(c)).join("")}</div>
+        </div>`;
+    }
+
+    const grid = document.getElementById("shopGrid");
+    if (filtered.length === 0 && !comboHtml) {
+        grid.innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i><p>Không tìm thấy sản phẩm</p></div>`;
+        return;
+    }
+
+    if (!category && !search) {
+        const grouped = {};
+        filtered.forEach(p => {
+            const cat = p.category || "Chưa phân loại";
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(p);
+        });
+        const catOrder = allCategories.map(c => c.name);
+        const sortedCats = Object.keys(grouped).sort((a, b) => {
+            const ia = catOrder.indexOf(a);
+            const ib = catOrder.indexOf(b);
+            if (ia >= 0 && ib >= 0) return ia - ib;
+            if (ia >= 0) return -1;
+            if (ib >= 0) return 1;
+            return a.localeCompare(b);
+        });
+        let html = comboHtml;
+        sortedCats.forEach(cat => {
+            const items = grouped[cat];
+            html += `<div class="shop-cat-section">
+                <div class="shop-cat-header" onclick="toggleShopCat(this)">
+                    <span class="cat-title"><i class="bi bi-folder2"></i>${escapeHtml(cat)} <span class="cat-count">${items.length}</span></span>
+                    <i class="bi bi-chevron-down cat-toggle"></i>
+                </div>
+                <div class="shop-cat-body">${items.map(p => renderShopCard(p)).join("")}</div>
+            </div>`;
+        });
+        grid.innerHTML = html;
+    } else {
+        grid.innerHTML = comboHtml + `<div class="shop-cat-section">
+            <div class="shop-cat-body" style="display:grid">${filtered.map(p => renderShopCard(p)).join("")}</div>
+        </div>`;
+    }
+}
+
+function toggleShopCat(header) {
+    header.classList.toggle("collapsed");
+    const body = header.nextElementSibling;
+    body.classList.toggle("collapsed");
+}
+
+// ===== SALES ASSISTANT CHAT =====
+let salesChatOpen = false;
+
+function toggleSalesChat() {
+    salesChatOpen = !salesChatOpen;
+    document.getElementById("salesChatPanel").classList.toggle("open", salesChatOpen);
+    if (salesChatOpen) {
+        document.getElementById("salesChatInput").focus();
+    }
+}
+
+function quickSalesMsg(msg) {
+    document.getElementById("salesChatInput").value = msg;
+    sendSalesMsg();
+}
+
+async function sendSalesMsg() {
+    const input = document.getElementById("salesChatInput");
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    const body = document.getElementById("salesChatBody");
+    const sendBtn = document.getElementById("salesSendBtn");
+
+    addSalesMsg(msg, "user");
+    input.value = "";
+    sendBtn.disabled = true;
+
+    const loadingId = addSalesMsg('<div class="sales-typing"><span></span><span></span><span></span></div>', "ai", true);
+
+    try {
+        const res = await fetch("/api/ai/sales-assistant", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        removeSalesMsg(loadingId);
+        if (data.error) {
+            addSalesMsg("Lỗi: " + data.error, "ai");
+        } else {
+            addSalesMsg(data.reply, "ai");
+        }
+    } catch (e) {
+        removeSalesMsg(loadingId);
+        addSalesMsg("Lỗi kết nối AI. Đảm bảo Ollama đang chạy.", "ai");
+    } finally {
+        sendBtn.disabled = false;
+        input.focus();
+    }
+}
+
+function addSalesMsg(content, type, isLoading = false) {
+    const body = document.getElementById("salesChatBody");
+    const id = "sales-msg-" + Date.now();
+    const div = document.createElement("div");
+    div.className = `sales-msg sales-msg-${type}${isLoading ? " sales-msg-loading" : ""}`;
+    div.id = id;
+    div.innerHTML = `<div class="sales-msg-content">${type === "ai" ? content : escapeHtml(content)}</div>`;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+    return id;
+}
+
+function removeSalesMsg(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
 }
