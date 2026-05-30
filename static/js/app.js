@@ -1,185 +1,169 @@
 const API = "/api/products";
 let allProducts = [];
-let searchTimeout = null;
+let allCombos = [];
+let allCustomers = [];
+let allDeals = [];
 let cart = [];
+let searchTimeout = null;
+let customerSearchTimeout = null;
+let selectedCustomerId = null;
 
-function formatVND(amount) {
-    return Number(amount).toLocaleString("vi-VN") + "₫";
-}
+function formatVND(n) { return Number(n).toLocaleString("vi-VN") + "₫"; }
 
+function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+const STATUS_MAP = {
+    pending: { label: "Chờ xử lý", cls: "badge-pending" },
+    confirmed: { label: "Đã xác nhận", cls: "badge-confirmed" },
+    processing: { label: "Đang xử lý", cls: "badge-processing" },
+    shipping: { label: "Đang giao", cls: "badge-shipping" },
+    delivered: { label: "Đã giao", cls: "badge-delivered" },
+    completed: { label: "Hoàn thành", cls: "badge-completed" },
+    cancelled: { label: "Đã huỷ", cls: "badge-cancelled" },
+    returning: { label: "Hoàn trả", cls: "badge-returning" },
+    refunded: { label: "Hoàn tiền", cls: "badge-refunded" },
+};
+function statusBadge(s) { const m = STATUS_MAP[s] || { label: s, cls: "badge-refunded" }; return `<span class="badge-status ${m.cls}">${m.label}</span>`; }
+
+const AVATAR_COLORS = ["#2563eb","#7c3aed","#db2777","#dc2626","#ea580c","#16a34a","#0891b2","#4f46e5"];
+function avatarColor(name) { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]; }
+
+// ===== INIT =====
 document.addEventListener("DOMContentLoaded", () => {
     loadProducts();
     loadPendingCount();
-    document.getElementById("searchInput").addEventListener("input", () => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => applyFilters(), 300);
-    });
 });
 
+// ===== NAVIGATION =====
+function go(view) {
+    ["dashboard", "products", "orders", "customers", "customTable"].forEach(v => {
+        const el = document.getElementById("view-" + v);
+        if (el) el.style.display = "none";
+        const nav = document.getElementById("nav-" + v);
+        if (nav) nav.classList.remove("active");
+    });
+    const el = document.getElementById("view-" + view);
+    if (el) el.style.display = "block";
+    const nav = document.getElementById("nav-" + view);
+    if (nav) nav.classList.add("active");
+
+    if (view === "dashboard") loadDashboard();
+    else if (view === "products") { applyShopFilters(); }
+    else if (view === "orders") loadDeals();
+    else if (view === "customers") loadCustomers();
+    else if (view === "customTable") loadCustomTableData();
+}
+
+// ===== DASHBOARD =====
+async function loadDashboard() {
+    const [statsRes, dealsRes] = await Promise.all([
+        fetch("/api/deals/stats"),
+        fetch("/api/deals")
+    ]);
+    const stats = await statsRes.json();
+    allDeals = await dealsRes.json();
+
+    document.getElementById("statsRow").innerHTML = `
+        <div class="stat-card"><div class="stat-label">Tổng doanh thu</div><div class="stat-value">${formatVND(stats.total_revenue || 0)}</div></div>
+        <div class="stat-card"><div class="stat-label">Lợi nhuận</div><div class="stat-value" style="color:var(--success)">${formatVND(stats.total_profit || 0)}</div></div>
+        <div class="stat-card"><div class="stat-label">Tổng đơn</div><div class="stat-value">${stats.total_deals || 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Chờ xử lý</div><div class="stat-value" style="color:var(--warning)">${stats.pending || 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Đang giao</div><div class="stat-value" style="color:var(--info)">${(stats.shipping || 0) + (stats.processing || 0)}</div></div>
+        <div class="stat-card"><div class="stat-label">Hoàn thành</div><div class="stat-value" style="color:var(--success)">${(stats.completed || 0) + (stats.delivered || 0)}</div></div>
+    `;
+
+    const recent = allDeals.slice(0, 5);
+    const container = document.getElementById("recentDeals");
+    if (recent.length === 0) {
+        container.innerHTML = `<div class="empty-state"><i class="bi bi-receipt"></i><p>Chưa có đơn hàng nào</p></div>`;
+        return;
+    }
+    container.innerHTML = `<table class="table table-hover mb-0"><tbody>` + recent.map(d => {
+        const date = new Date(d.created_at).toLocaleDateString("vi-VN");
+        return `<tr class="cursor-pointer" onclick="showDealDetail('${d.id}')" style="cursor:pointer">
+            <td><span class="fw-600">${escapeHtml(d.customer_name || "Khách mới")}</span><br><small class="text-muted">${date}</small></td>
+            <td class="text-end">${statusBadge(d.status)}</td>
+            <td class="text-end fw-600">${formatVND(d.total)}</td>
+        </tr>`;
+    }).join("") + `</tbody></table>`;
+}
+
+// ===== PRODUCTS =====
+function showProductTab(tab) {
+    ["shop", "manage", "combos", "categories"].forEach(t => {
+        document.getElementById("ptab-" + t).classList.toggle("active", t === tab);
+        const content = document.getElementById("ptab" + t + "-content");
+        if (content) content.style.display = t === tab ? "block" : "none";
+    });
+    if (tab === "shop") applyShopFilters();
+    else if (tab === "manage") applyFilters();
+    else if (tab === "combos") loadCombos();
+    else if (tab === "categories") loadCategories();
+}
+
 async function loadProducts() {
-    const res = await fetch(API);
-    allProducts = await res.json();
+    const [pRes, cRes, catRes] = await Promise.all([fetch(API), fetch("/api/combos"), fetch("/api/categories")]);
+    allProducts = await pRes.json();
+    allCombos = await cRes.json();
+    allCategories = await catRes.json();
     populateCategoryFilter();
     populateShopCategoryFilter();
-    applyFilters();
-    const comboRes = await fetch("/api/combos");
-    allCombos = await comboRes.json();
     applyShopFilters();
 }
 
 function populateCategoryFilter() {
-    const select = document.getElementById("categoryFilter");
-    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
-    const current = select.value;
-    select.innerHTML = '<option value="">All Categories</option>' +
-        categories.map(c => `<option value="${c}"${c === current ? " selected" : ""}>${c}</option>`).join("");
+    const sel = document.getElementById("categoryFilter");
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Tất cả</option>' + allCategories.map(c => `<option value="${c.name}"${c.name === cur ? " selected" : ""}>${c.name}</option>`).join("");
+}
+function populateShopCategoryFilter() {
+    const sel = document.getElementById("shopCategoryFilter");
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Tất cả danh mục</option>' + allCategories.map(c => `<option value="${c.name}"${c.name === cur ? " selected" : ""}>${c.name}</option>`).join("");
 }
 
 function applyFilters() {
-    const search = document.getElementById("searchInput").value.trim().toLowerCase();
-    const category = document.getElementById("categoryFilter").value;
-    const minPrice = parseFloat(document.getElementById("priceMin").value) || 0;
-    const maxPrice = parseFloat(document.getElementById("priceMax").value) || Infinity;
-
+    const search = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
+    const category = document.getElementById("categoryFilter")?.value || "";
     let filtered = allProducts.filter(p => {
-        if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search)) return false;
+        if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search) && !(p.size || "").toLowerCase().includes(search) && !(p.color || "").toLowerCase().includes(search)) return false;
         if (category && p.category !== category) return false;
-        if (p.price < minPrice) return false;
-        if (p.price > maxPrice) return false;
         return true;
     });
-
     renderProducts(filtered);
 }
 
 function clearFilters() {
     document.getElementById("searchInput").value = "";
     document.getElementById("categoryFilter").value = "";
-    document.getElementById("priceMin").value = "";
-    document.getElementById("priceMax").value = "";
     applyFilters();
-}
-
-const PLACEHOLDER_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
-
-function getPlaceholderColor(name) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return PLACEHOLDER_COLORS[Math.abs(hash) % PLACEHOLDER_COLORS.length];
-}
-
-function renderProductCard(p, mode) {
-    const color = getPlaceholderColor(p.name);
-    const initials = p.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
-    if (mode === "shop") {
-        return `
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6">
-            <div class="shop-card">
-                <div class="shop-card-icon" style="background:linear-gradient(135deg, ${color}, ${color}cc)">
-                    <span class="initials">${initials}</span>
-                </div>
-                <div class="shop-card-body">
-                    <div class="shop-card-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
-                    ${p.category ? `<div class="shop-card-cat">${escapeHtml(p.category)}</div>` : ""}
-                </div>
-                <div class="shop-card-right">
-                    <div class="shop-card-price">${formatVND(p.price)}</div>
-                    <button class="btn btn-warning shop-card-btn" onclick="addToCart('${p.id}')">
-                        <i class="bi bi-cart-plus"></i>
-                    </button>
-                </div>
-            </div>
-        </div>`;
-    }
-    return `
-    <div class="col-xl-3 col-lg-4 col-md-6">
-        <div class="product-card">
-            <div class="product-img" style="background:linear-gradient(135deg, ${color}, ${color}dd)">
-                <span class="product-initials">${initials}</span>
-                ${p.category ? `<span class="product-badge">${escapeHtml(p.category)}</span>` : ""}
-            </div>
-            <div class="product-info">
-                <h6 class="product-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h6>
-                <p class="product-desc">${escapeHtml(p.description || "No description")}</p>
-                <div class="product-price">${formatVND(p.price)}</div>
-            </div>
-            <div class="product-actions">
-                <button class="btn btn-sm btn-outline-primary" onclick="showEditModal('${p.id}')" title="Edit">
-                    <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
-        </div>
-    </div>`;
-}
-
-function renderProductGrid(gridId, products, mode) {
-    const grid = document.getElementById(gridId);
-    if (products.length === 0) {
-        grid.innerHTML = `
-            <div class="col-12 text-center py-5 text-muted">
-                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                No products found.
-            </div>`;
-        return;
-    }
-    grid.innerHTML = products.map(p => renderProductCard(p, mode)).join("");
 }
 
 function renderProducts(products) {
     const tbody = document.getElementById("productTableBody");
     if (products.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
-            <i class="bi bi-inbox fs-3 d-block mb-2"></i>No products found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4"><i class="bi bi-inbox fs-3 d-block mb-2"></i>Không tìm thấy sản phẩm</td></tr>`;
         return;
     }
     tbody.innerHTML = products.map(p => `<tr>
-        <td class="fw-bold">${escapeHtml(p.name)}</td>
-        <td>${p.category ? `<span class="badge bg-secondary">${escapeHtml(p.category)}</span>` : '<span class="text-muted">—</span>'}</td>
-        <td class="text-end fw-semibold text-success">${formatVND(p.price)}</td>
-        <td class="text-end text-muted">${p.cost_price ? formatVND(p.cost_price) : '—'}</td>
-        <td class="text-muted" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.description || '—')}</td>
+        <td class="fw-600">${escapeHtml(p.name)}</td>
+        <td>${p.category ? `<span class="badge-cat">${escapeHtml(p.category)}</span>` : "—"}</td>
+        <td>${p.size ? escapeHtml(p.size) : "—"}</td>
+        <td>${p.color ? escapeHtml(p.color) : "—"}</td>
+        <td class="text-end fw-600">${formatVND(p.price)}</td>
+        <td class="text-end text-muted">${p.cost_price ? formatVND(p.cost_price) : "—"}</td>
         <td class="text-center">
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditModal('${p.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}', '${escapeHtml(p.name)}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditModal('${p.id}')" title="Sửa"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="showDeleteModal('${p.id}','${escapeHtml(p.name)}')" title="Xoá"><i class="bi bi-trash"></i></button>
         </td>
     </tr>`).join("");
 }
 
-function renderShop(products) {
-    renderProductGrid("shopGrid", products, "shop");
-}
-
-function renderComboCard(c) {
-    const saving = c.original_price - c.combo_price;
-    const savePct = c.original_price > 0 ? ((saving / c.original_price) * 100).toFixed(0) : 0;
-    const productList = c.items.map(i => `${i.product_name} ×${i.qty}`).join(", ");
-    return `
-    <div class="col-xl-2 col-lg-3 col-md-4 col-6">
-        <div class="shop-card combo-card">
-            <div class="shop-card-icon" style="background:linear-gradient(135deg, #f59e0b, #ef4444)">
-                <span class="initials"><i class="bi bi-collection"></i></span>
-            </div>
-            <div class="shop-card-body">
-                <div class="shop-card-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</div>
-                <div class="shop-card-cat">${escapeHtml(productList)}</div>
-            </div>
-            <div class="shop-card-right">
-                <div class="shop-card-price">${formatVND(c.combo_price)}</div>
-                <span class="combo-tag badge bg-danger">-${savePct}%</span>
-                <button class="btn btn-warning shop-card-btn" onclick="addComboToCart('${c.id}')">
-                    <i class="bi bi-cart-plus"></i>
-                </button>
-            </div>
-        </div>
-    </div>`;
-}
-
 function applyShopFilters() {
-    const search = document.getElementById("shopSearch").value.trim().toLowerCase();
-    const category = document.getElementById("shopCategoryFilter").value;
+    const search = (document.getElementById("shopSearch")?.value || "").trim().toLowerCase();
+    const category = document.getElementById("shopCategoryFilter")?.value || "";
     let filtered = allProducts.filter(p => {
         if (search && !p.name.toLowerCase().includes(search) && !(p.category || "").toLowerCase().includes(search)) return false;
         if (category && p.category !== category) return false;
@@ -187,1319 +171,859 @@ function applyShopFilters() {
     });
 
     let comboHtml = "";
-    if (allCombos.length > 0) {
-        let filteredCombos = allCombos;
-        if (search) {
-            filteredCombos = allCombos.filter(c =>
-                c.name.toLowerCase().includes(search) ||
-                c.items.some(i => i.product_name.toLowerCase().includes(search))
-            );
-        }
-        if (filteredCombos.length > 0) {
-            comboHtml = `<div class="col-12"><h5 class="mb-3"><i class="bi bi-collection me-2"></i>Combos</h5></div>` +
-                filteredCombos.map(c => renderComboCard(c)).join("") +
-                `<div class="col-12"><hr><h5 class="mb-3"><i class="bi bi-box-seam me-2"></i>Products</h5></div>`;
-        }
+    let filteredCombos = allCombos;
+    if (search) filteredCombos = allCombos.filter(c => c.name.toLowerCase().includes(search) || c.items.some(i => i.product_name.toLowerCase().includes(search)));
+    if (filteredCombos.length > 0) {
+        comboHtml = `<div class="col-12 mb-2"><h6 class="text-muted fw-600">Gói sản phẩm</h6></div>` +
+            filteredCombos.map(c => renderComboCard(c)).join("") +
+            `<div class="col-12 mt-3 mb-2"><h6 class="text-muted fw-600">Sản phẩm đơn lẻ</h6></div>`;
     }
 
     const grid = document.getElementById("shopGrid");
     if (filtered.length === 0 && !comboHtml) {
-        grid.innerHTML = `<div class="col-12 text-center py-5 text-muted">
-            <i class="bi bi-inbox fs-1 d-block mb-2"></i>No products found.</div>`;
+        grid.innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i><p>Không tìm thấy sản phẩm</p></div>`;
         return;
     }
-
-    grid.innerHTML = comboHtml + filtered.map(p => renderProductCard(p, "shop")).join("");
+    grid.innerHTML = comboHtml + filtered.map(p => renderShopCard(p)).join("");
 }
 
-function populateShopCategoryFilter() {
-    const select = document.getElementById("shopCategoryFilter");
-    if (!select) return;
-    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
-    const current = select.value;
-    select.innerHTML = '<option value="">All Categories</option>' +
-        categories.map(c => `<option value="${c}"${c === current ? " selected" : ""}>${c}</option>`).join("");
+function renderShopCard(p) {
+    return `<div class="shop-item">
+        <div class="shop-item-name">${escapeHtml(p.name)}</div>
+        <div class="shop-item-meta">${p.category ? escapeHtml(p.category) : ""}${p.size ? " · " + escapeHtml(p.size) : ""}${p.color ? " · " + escapeHtml(p.color) : ""}</div>
+        <div class="shop-item-price">${formatVND(p.price)}</div>
+        <button class="btn btn-sm btn-warning" onclick="addToCart('${p.id}')"><i class="bi bi-cart-plus me-1"></i>Thêm</button>
+    </div>`;
 }
 
-function updateStats(products) {}
+function renderComboCard(c) {
+    const saving = c.original_price - c.combo_price;
+    const pct = c.original_price > 0 ? ((saving / c.original_price) * 100).toFixed(0) : 0;
+    const items = c.items.map(i => `${i.product_name} ×${i.qty}`).join(", ");
+    return `<div class="shop-item combo-item">
+        <div class="shop-item-name">${escapeHtml(c.name)}</div>
+        <div class="shop-item-meta">${escapeHtml(items)}</div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="shop-item-price">${formatVND(c.combo_price)}</div>
+            ${pct > 0 ? `<span class="badge-status badge-pending">-${pct}%</span>` : ""}
+        </div>
+        <button class="btn btn-sm btn-warning" onclick="addComboToCart('${c.id}')"><i class="bi bi-cart-plus me-1"></i>Thêm</button>
+    </div>`;
+}
 
+// ===== PRODUCT CRUD =====
+function populateProductCategoryDropdown(selected) {
+    const sel = document.getElementById("productCategory");
+    sel.innerHTML = '<option value="">-- Chọn danh mục --</option>' + allCategories.map(c => `<option value="${c.name}"${c.name === selected ? " selected" : ""}>${c.name}</option>`).join("");
+}
 function showAddModal() {
-    document.getElementById("productModalTitle").textContent = "Add Product";
+    document.getElementById("productModalTitle").textContent = "Thêm sản phẩm";
     document.getElementById("productId").value = "";
-    document.getElementById("productForm").reset();
+    document.getElementById("productName").value = "";
+    document.getElementById("productPrice").value = "";
+    document.getElementById("productCostPrice").value = "";
+    document.getElementById("productSize").value = "";
+    document.getElementById("productColor").value = "";
+    document.getElementById("productImageUrl").value = "";
+    document.getElementById("productDescription").value = "";
+    populateProductCategoryDropdown("");
     new bootstrap.Modal(document.getElementById("productModal")).show();
 }
-
 function showEditModal(id) {
-    const product = allProducts.find((p) => p.id === id);
-    if (!product) return;
-    document.getElementById("productModalTitle").textContent = "Edit Product";
-    document.getElementById("productId").value = product.id;
-    document.getElementById("productName").value = product.name;
-    document.getElementById("productPrice").value = product.price;
-    document.getElementById("productCostPrice").value = product.cost_price || "";
-    document.getElementById("productCategory").value = product.category || "";
-    document.getElementById("productDescription").value =
-        product.description || "";
+    const p = allProducts.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById("productModalTitle").textContent = "Sửa sản phẩm";
+    document.getElementById("productId").value = p.id;
+    document.getElementById("productName").value = p.name;
+    document.getElementById("productPrice").value = p.price;
+    document.getElementById("productCostPrice").value = p.cost_price || "";
+    populateProductCategoryDropdown(p.category || "");
+    document.getElementById("productSize").value = p.size || "";
+    document.getElementById("productColor").value = p.color || "";
+    document.getElementById("productImageUrl").value = p.image_url || "";
+    document.getElementById("productDescription").value = p.description || "";
     new bootstrap.Modal(document.getElementById("productModal")).show();
 }
-
 async function saveProduct() {
     const id = document.getElementById("productId").value;
     const name = document.getElementById("productName").value.trim();
     const price = document.getElementById("productPrice").value;
     const category = document.getElementById("productCategory").value.trim();
-    const description = document
-        .getElementById("productDescription")
-        .value.trim();
-
-    if (!name || !price) {
-        showToast("Name and price are required", "danger");
-        return;
-    }
-
-    const costPrice = document.getElementById("productCostPrice").value;
-    const body = { name, price: parseFloat(price), cost_price: costPrice ? parseFloat(costPrice) : 0, category, description };
-    const url = id ? `${API}/${id}` : API;
-    const method = id ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || "Failed to save", "danger");
-        return;
-    }
-
+    if (!name || !price || !category) { showToast("Tên, giá và danh mục là bắt buộc", "danger"); return; }
+    const body = {
+        name, price: parseFloat(price),
+        cost_price: parseFloat(document.getElementById("productCostPrice").value) || 0,
+        category,
+        size: document.getElementById("productSize").value.trim(),
+        color: document.getElementById("productColor").value.trim(),
+        image_url: document.getElementById("productImageUrl").value.trim(),
+        description: document.getElementById("productDescription").value.trim(),
+    };
+    const res = await fetch(id ? `${API}/${id}` : API, { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) { showToast((await res.json()).error || "Lỗi", "danger"); return; }
     bootstrap.Modal.getInstance(document.getElementById("productModal")).hide();
-    showToast(id ? "Product updated" : "Product created", "success");
+    showToast(id ? "Đã cập nhật" : "Đã tạo sản phẩm", "success");
     loadProducts();
 }
-
 function showDeleteModal(id, name) {
     document.getElementById("deleteProductName").textContent = name;
     const modal = new bootstrap.Modal(document.getElementById("deleteModal"));
-    const btn = document.getElementById("confirmDeleteBtn");
-    btn.onclick = async () => {
+    document.getElementById("confirmDeleteBtn").onclick = async () => {
         const res = await fetch(`${API}/${id}`, { method: "DELETE" });
-        if (res.ok) {
-            modal.hide();
-            showToast("Product deleted", "success");
-            loadProducts();
-        } else {
-            showToast("Failed to delete", "danger");
-        }
+        if (res.ok) { modal.hide(); showToast("Đã xoá", "success"); loadProducts(); }
     };
     modal.show();
 }
-
 function showImportModal() {
-    document.getElementById("importFile").value = "";
-    document.getElementById("jsonInput").value = "";
-    document.getElementById("importResults").classList.add("d-none");
-    new bootstrap.Modal(document.getElementById("importModal")).show();
+    const fi = document.getElementById("importFile");
+    const ji = document.getElementById("jsonInput");
+    const ir = document.getElementById("importResults");
+    if (fi) fi.value = "";
+    if (ji) ji.value = "";
+    if (ir) ir.classList.add("d-none");
+    const modal = document.getElementById("importModal");
+    if (modal) new bootstrap.Modal(modal).show();
 }
-
 async function importProducts() {
     const fileInput = document.getElementById("importFile");
     const jsonInput = document.getElementById("jsonInput").value.trim();
-    const activeTab = document.querySelector("#importModal .nav-link.active");
-    const isFileTab = activeTab?.getAttribute("data-bs-target") === "#fileTab";
-
+    const isFile = document.querySelector("#importModal .nav-link.active")?.getAttribute("data-bs-target") === "#fileTab";
     let res;
-
-    if (isFileTab && fileInput.files.length > 0) {
-        const formData = new FormData();
-        formData.append("file", fileInput.files[0]);
-        res = await fetch(`${API}/import`, { method: "POST", body: formData });
-    } else if (!isFileTab && jsonInput) {
-        try {
-            JSON.parse(jsonInput);
-        } catch {
-            showToast("Invalid JSON format", "danger");
-            return;
-        }
-        res = await fetch(`${API}/import`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: jsonInput,
-        });
-    } else {
-        showToast("Please provide a file or paste JSON", "danger");
-        return;
-    }
-
+    if (isFile && fileInput.files.length > 0) {
+        const fd = new FormData(); fd.append("file", fileInput.files[0]);
+        res = await fetch(`${API}/import`, { method: "POST", body: fd });
+    } else if (!isFile && jsonInput) {
+        try { JSON.parse(jsonInput); } catch { showToast("JSON không hợp lệ", "danger"); return; }
+        res = await fetch(`${API}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: jsonInput });
+    } else { showToast("Chọn file hoặc dán JSON", "danger"); return; }
     const data = await res.json();
-    const resultsDiv = document.getElementById("importResults");
-    const alertDiv = document.getElementById("importAlert");
-    resultsDiv.classList.remove("d-none");
-
+    const results = document.getElementById("importResults");
+    const alert = document.getElementById("importAlert");
+    results.classList.remove("d-none");
     if (data.imported > 0) {
-        let msg = `<i class="bi bi-check-circle me-2"></i>Successfully imported ${data.imported} product(s).`;
-        if (data.errors && data.errors.length > 0) {
-            msg += `<br><small class="text-muted">${data.errors.length} row(s) had errors.</small>`;
-        }
-        alertDiv.className = "alert alert-success";
-        alertDiv.innerHTML = msg;
+        alert.className = "alert alert-success"; alert.innerHTML = `<i class="bi bi-check-circle me-1"></i>Đã nhập ${data.imported} sản phẩm`;
         loadProducts();
     } else {
-        let msg = `<i class="bi bi-x-circle me-2"></i>No products imported.`;
-        if (data.errors && data.errors.length > 0) {
-            msg += "<br>Errors:<ul class='mb-0 mt-1'>";
-            data.errors.forEach((e) => {
-                msg += `<li>Row ${e.row}: ${escapeHtml(e.error)}</li>`;
-            });
-            msg += "</ul>";
-        }
-        if (data.error) {
-            msg = `<i class="bi bi-x-circle me-2"></i>${escapeHtml(data.error)}`;
-        }
-        alertDiv.className = "alert alert-danger";
-        alertDiv.innerHTML = msg;
+        alert.className = "alert alert-danger"; alert.innerHTML = data.error ? escapeHtml(data.error) : "Không nhập được sản phẩm nào";
     }
 }
 
-function showToast(message, type = "success") {
-    const toast = document.getElementById("appToast");
-    const body = document.getElementById("toastBody");
-    toast.className = `toast bg-${type} text-white`;
-    const icon =
-        type === "success" ? "bi-check-circle-fill" : "bi-exclamation-circle-fill";
-    body.innerHTML = `<i class="bi ${icon} me-2"></i>${message}`;
-    new bootstrap.Toast(toast, { delay: 3000 }).show();
-}
-
-function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-// --- Cart ---
-
+// ===== CART =====
 function toggleCart() {
-    const sidebar = document.getElementById("cartSidebar");
-    const overlay = document.getElementById("cartOverlay");
-    const open = sidebar.classList.toggle("open");
-    overlay.classList.toggle("open", open);
+    const s = document.getElementById("cartSidebar");
+    const o = document.getElementById("cartOverlay");
+    const open = s.classList.toggle("open");
+    o.classList.toggle("open", open);
 }
+function addToCart(pid) {
+    const p = allProducts.find(x => x.id === pid);
+    if (!p) return;
+    const ex = cart.find(i => i.id === pid);
+    if (ex) ex.qty++; else cart.push({ id: p.id, name: p.name, price: p.price, cost_price: p.cost_price || 0, qty: 1 });
+    renderCart(); showToast(`${p.name} đã thêm vào giỏ`, "success");
+}
+function addComboToCart(cid) {
+    const c = allCombos.find(x => x.id === cid);
+    if (!c) return;
+    const cartId = `combo_${cid}`;
+    const ex = cart.find(i => i.id === cartId);
+    if (ex) ex.qty++; else cart.push({ id: cartId, name: `[GÓI] ${c.name}`, price: c.combo_price, cost_price: c.cost_total || 0, qty: 1 });
+    renderCart(); showToast(`Gói "${c.name}" đã thêm`, "success");
+}
+function removeFromCart(pid) { cart = cart.filter(i => i.id !== pid); renderCart(); }
+function updateCartQty(pid, d) { const i = cart.find(x => x.id === pid); if (!i) return; i.qty += d; if (i.qty <= 0) cart = cart.filter(x => x.id !== pid); renderCart(); }
+function setCartQty(pid, v) { const q = parseInt(v, 10); if (isNaN(q) || q <= 0) cart = cart.filter(x => x.id !== pid); else { const i = cart.find(x => x.id === pid); if (i) i.qty = q; } renderCart(); }
+function clearCart() { cart = []; document.getElementById("discountInput").value = 0; document.getElementById("shippingInput").value = 0; renderCart(); showToast("Đã xoá giỏ hàng", "success"); }
 
-function addToCart(productId) {
-    const product = allProducts.find((p) => p.id === productId);
-    if (!product) return;
-    const existing = cart.find((item) => item.id === productId);
-    if (existing) {
-        existing.qty += 1;
-    } else {
-        cart.push({ id: product.id, name: product.name, price: product.price, cost_price: product.cost_price || 0, qty: 1 });
+function renderCart() {
+    const body = document.getElementById("cartBody");
+    const footer = document.getElementById("cartFooter");
+    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
+    document.getElementById("cartCount").textContent = totalItems;
+    const shopCount = document.getElementById("shopCartCount");
+    if (shopCount) shopCount.textContent = totalItems;
+
+    if (cart.length === 0) {
+        body.innerHTML = `<div class="empty-state"><i class="bi bi-cart-x"></i><p>Giỏ hàng trống</p></div>`;
+        footer.style.display = "none"; return;
     }
-    renderCart();
-    showToast(`${product.name} added to cart`, "success");
+    footer.style.display = "block";
+    let sub = 0, cost = 0;
+    body.innerHTML = cart.map(item => {
+        const line = item.price * item.qty; sub += line; cost += (item.cost_price || 0) * item.qty;
+        const detailsHtml = (item.details && item.details.length > 0)
+            ? `<div class="mt-1" style="font-size:.7rem;color:var(--text-3)">${item.details.map(d => `<div>· ${escapeHtml(d)}</div>`).join("")}</div>`
+            : "";
+        return `<div class="cart-item">
+            <div class="d-flex justify-content-between align-items-start">
+                <strong class="me-2" style="font-size:.82rem">${escapeHtml(item.name)}</strong>
+                <button class="btn btn-sm p-0 border-0 text-muted" onclick="removeFromCart('${item.id}')"><i class="bi bi-x"></i></button>
+            </div>
+            ${detailsHtml}
+            <div class="d-flex justify-content-between align-items-center mt-1">
+                <div class="input-group input-group-sm" style="width:100px">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="updateCartQty('${item.id}',-1)">-</button>
+                    <input type="number" class="form-control form-control-sm text-center" value="${item.qty}" min="1" onchange="setCartQty('${item.id}',this.value)" style="max-width:40px">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="updateCartQty('${item.id}',1)">+</button>
+                </div>
+                <span class="fw-600" style="font-size:.82rem">${formatVND(line)}</span>
+            </div>
+            <small class="text-muted">${formatVND(item.price)}/cái</small>
+        </div>`;
+    }).join("");
+
+    const discPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    const discAmt = sub * (discPct / 100);
+    const ship = parseFloat(document.getElementById("shippingInput").value) || 0;
+    const total = sub - discAmt + ship;
+    const profit = total - cost;
+
+    document.getElementById("cartItemCount").textContent = totalItems;
+    document.getElementById("cartSubtotal").textContent = formatVND(sub);
+    const discRow = document.getElementById("discountRow");
+    if (discPct > 0) { discRow.style.setProperty("display", "flex", "important"); document.getElementById("cartDiscount").textContent = "-" + formatVND(discAmt); }
+    else discRow.style.setProperty("display", "none", "important");
+    document.getElementById("cartTotal").textContent = formatVND(total);
+    document.getElementById("cartProfit").textContent = formatVND(profit);
+    document.getElementById("cartProfit").className = `fw-600 ${profit >= 0 ? "text-success" : "text-danger"}`;
+    const margin = total > 0 ? (profit / total * 100).toFixed(1) : 0;
+    document.getElementById("cartMargin").textContent = margin + "%";
+    document.getElementById("cartMargin").className = `small fw-600 ${profit >= 0 ? "text-success" : "text-danger"}`;
 }
 
-function addComboToCart(comboId) {
-    const combo = allCombos.find(c => c.id === comboId);
-    if (!combo) return;
-    const cartId = `combo_${comboId}`;
-    const existing = cart.find(item => item.id === cartId);
-    if (existing) {
-        existing.qty += 1;
-    } else {
-        cart.push({
-            id: cartId,
-            name: `[COMBO] ${combo.name}`,
-            price: combo.combo_price,
-            cost_price: combo.cost_total || 0,
-            qty: 1
-        });
-    }
-    renderCart();
-    showToast(`Combo "${combo.name}" added to cart`, "success");
-}
-
-function removeFromCart(productId) {
-    cart = cart.filter((item) => item.id !== productId);
-    renderCart();
-}
-
-function updateCartQty(productId, delta) {
-    const item = cart.find((i) => i.id === productId);
-    if (!item) return;
-    item.qty += delta;
-    if (item.qty <= 0) {
-        cart = cart.filter((i) => i.id !== productId);
-    }
-    renderCart();
-}
-
-function setCartQty(productId, value) {
-    const qty = parseInt(value, 10);
-    if (isNaN(qty) || qty <= 0) {
-        cart = cart.filter((i) => i.id !== productId);
-    } else {
-        const item = cart.find((i) => i.id === productId);
-        if (item) item.qty = qty;
-    }
-    renderCart();
-}
-
-function clearCart() {
-    cart = [];
-    document.getElementById("discountInput").value = 0;
-    document.getElementById("shippingInput").value = 0;
-    renderCart();
-    showToast("Cart cleared", "success");
-}
-
+// ===== DEAL SUMMARY =====
 function showDealSummary() {
     if (cart.length === 0) return;
-    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
-    let subtotal = 0;
-    const rows = cart.map((item) => {
-        const lineTotal = item.price * item.qty;
-        subtotal += lineTotal;
-        return `<tr>
-            <td>${escapeHtml(item.name)}</td>
-            <td class="text-center">${item.qty}</td>
-            <td class="text-end">${formatVND(item.price)}</td>
-            <td class="text-end">${formatVND(lineTotal)}</td>
-        </tr>`;
-    }).join("");
-    const discountAmt = subtotal * (discountPct / 100);
-    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
-    const finalTotal = subtotal - discountAmt + shippingFee;
-    const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-
-    document.getElementById("dealSummaryBody").innerHTML = `
-        <div id="dealPrintArea">
-            <div class="text-center mb-4">
-                <h4 class="fw-bold">Deal Quotation</h4>
-                <p class="text-muted mb-0">${date}</p>
-            </div>
-            <table class="table table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th>Product</th>
-                        <th class="text-center" style="width:80px">Qty</th>
-                        <th class="text-end" style="width:120px">Unit Price</th>
-                        <th class="text-end" style="width:120px">Total</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="3" class="text-end fw-semibold">Subtotal</td>
-                        <td class="text-end fw-semibold">${formatVND(subtotal)}</td>
-                    </tr>
-                    ${discountPct > 0 ? `<tr>
-                        <td colspan="3" class="text-end text-danger">Discount (${discountPct}%)</td>
-                        <td class="text-end text-danger">-${formatVND(discountAmt)}</td>
-                    </tr>` : ""}
-                    ${shippingFee > 0 ? `<tr>
-                        <td colspan="3" class="text-end"><i class="bi bi-truck me-1"></i>Shipping</td>
-                        <td class="text-end">${formatVND(shippingFee)}</td>
-                    </tr>` : ""}
-                    <tr class="table-primary">
-                        <td colspan="3" class="text-end fs-5 fw-bold">Grand Total</td>
-                        <td class="text-end fs-5 fw-bold">${formatVND(finalTotal)}</td>
-                    </tr>
-                </tfoot>
-            </table>
-            ${discountPct > 0 ? `<p class="text-muted small">* A ${discountPct}% bulk discount has been applied.</p>` : ""}
-        </div>`;
+    const discPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    let sub = 0;
+    const rows = cart.map(item => { const l = item.price * item.qty; sub += l; return `<tr><td>${escapeHtml(item.name)}</td><td class="text-center">${item.qty}</td><td class="text-end">${formatVND(item.price)}</td><td class="text-end">${formatVND(l)}</td></tr>`; }).join("");
+    const discAmt = sub * (discPct / 100);
+    const ship = parseFloat(document.getElementById("shippingInput").value) || 0;
+    const total = sub - discAmt + ship;
+    const date = new Date().toLocaleDateString("vi-VN", { year: "numeric", month: "long", day: "numeric" });
+    document.getElementById("dealSummaryBody").innerHTML = `<div id="dealPrintArea">
+        <div class="text-center mb-3"><h5 class="fw-bold">Báo giá đơn hàng</h5><small class="text-muted">${date}</small></div>
+        <table class="table table-bordered"><thead class="table-light"><tr><th>Sản phẩm</th><th class="text-center" style="width:70px">SL</th><th class="text-end" style="width:110px">Đơn giá</th><th class="text-end" style="width:110px">Thành tiền</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+            <tr><td colspan="3" class="text-end fw-600">Tạm tính</td><td class="text-end fw-600">${formatVND(sub)}</td></tr>
+            ${discPct > 0 ? `<tr><td colspan="3" class="text-end text-danger">Giảm ${discPct}%</td><td class="text-end text-danger">-${formatVND(discAmt)}</td></tr>` : ""}
+            ${ship > 0 ? `<tr><td colspan="3" class="text-end">Phí ship</td><td class="text-end">${formatVND(ship)}</td></tr>` : ""}
+            <tr class="table-primary"><td colspan="3" class="text-end fw-bold">Tổng cộng</td><td class="text-end fw-bold">${formatVND(total)}</td></tr>
+        </tfoot></table></div>`;
     new bootstrap.Modal(document.getElementById("dealSummaryModal")).show();
 }
-
 function printDealSummary() {
-    const content = document.getElementById("dealPrintArea").innerHTML;
-    const win = window.open("", "_blank");
-    win.document.write(`<html><head><title>Deal Summary</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>body{padding:2rem}@media print{body{padding:0}}</style>
-        </head><body>${content}</body></html>`);
-    win.document.close();
-    win.onload = () => { win.print(); };
+    const w = window.open("", "_blank");
+    w.document.write(`<html><head><title>Tóm tắt</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><style>body{padding:2rem;font-size:13px}@media print{body{padding:0}}</style></head><body>${document.getElementById("dealPrintArea").innerHTML}</body></html>`);
+    w.document.close(); w.onload = () => w.print();
 }
 
-// --- Checkout & Deals ---
-
+// ===== CHECKOUT =====
 function showCheckoutModal() {
     if (cart.length === 0) return;
+    selectedCustomerId = null;
+    document.getElementById("checkoutPhoneSearch").value = "";
     document.getElementById("checkoutName").value = "";
     document.getElementById("checkoutPhone").value = "";
     document.getElementById("checkoutAddress").value = "";
     document.getElementById("checkoutNotes").value = "";
+    document.getElementById("customerSearchResults").style.display = "none";
 
-    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
-    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
-    let subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-    const discountAmt = subtotal * (discountPct / 100);
-    const total = subtotal - discountAmt + shippingFee;
-    const itemCount = cart.reduce((s, i) => s + i.qty, 0);
-
-    document.getElementById("checkoutSummary").innerHTML =
-        `<strong>${itemCount} item(s)</strong> | Subtotal: ${formatVND(subtotal)}` +
-        (discountPct > 0 ? ` | Discount: ${discountPct}% (-${formatVND(discountAmt)})` : "") +
-        (shippingFee > 0 ? ` | Shipping: ${formatVND(shippingFee)}` : "") +
-        ` | <strong>Total: ${formatVND(total)}</strong>`;
-
+    const discPct = parseFloat(document.getElementById("discountInput").value) || 0;
+    const ship = parseFloat(document.getElementById("shippingInput").value) || 0;
+    let sub = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const discAmt = sub * (discPct / 100);
+    const total = sub - discAmt + ship;
+    const items = cart.reduce((s, i) => s + i.qty, 0);
+    document.getElementById("checkoutSummary").innerHTML = `<strong>${items} sản phẩm</strong> | Tạm tính: ${formatVND(sub)}${discPct > 0 ? ` | Giảm: ${discPct}%` : ""}${ship > 0 ? ` | Ship: ${formatVND(ship)}` : ""} | <strong>Tổng: ${formatVND(total)}</strong>`;
     toggleCart();
     new bootstrap.Modal(document.getElementById("checkoutModal")).show();
 }
 
+function debounceSearchCustomer() {
+    clearTimeout(customerSearchTimeout);
+    customerSearchTimeout = setTimeout(searchCheckoutCustomer, 300);
+}
+async function searchCheckoutCustomer() {
+    const q = document.getElementById("checkoutPhoneSearch").value.trim();
+    const box = document.getElementById("customerSearchResults");
+    if (q.length < 2) { box.style.display = "none"; return; }
+    const res = await fetch(`/api/customers/search?q=${encodeURIComponent(q)}`);
+    const results = await res.json();
+    if (results.length === 0) { box.style.display = "none"; return; }
+    box.innerHTML = results.map(c => `<div class="search-result-item" onclick="selectCheckoutCustomer('${c.id}','${escapeHtml(c.name).replace(/'/g,"\\'")}','${escapeHtml(c.phone || "").replace(/'/g,"\\'")}','${escapeHtml(c.address || "").replace(/'/g,"\\'")}')">
+        <strong>${escapeHtml(c.name)}</strong><br><small class="text-muted">${escapeHtml(c.phone || "—")} · ${escapeHtml(c.address || "—")}</small>
+    </div>`).join("");
+    box.style.display = "block";
+}
+function selectCheckoutCustomer(id, name, phone, address) {
+    selectedCustomerId = id;
+    document.getElementById("checkoutName").value = name;
+    document.getElementById("checkoutPhone").value = phone;
+    document.getElementById("checkoutAddress").value = address;
+    document.getElementById("customerSearchResults").style.display = "none";
+}
+
 async function submitDeal() {
     const name = document.getElementById("checkoutName").value.trim();
-    if (!name) {
-        showToast("Customer name is required", "danger");
-        return;
-    }
-
-    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
-    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
-    const items = cart.map(i => ({
-        name: i.name, unit_price: i.price, cost_price: i.cost_price || 0, qty: i.qty
-    }));
-
+    if (!name) { showToast("Tên khách hàng là bắt buộc", "danger"); return; }
     const body = {
+        customer_id: selectedCustomerId || "",
         customer_name: name,
         customer_phone: document.getElementById("checkoutPhone").value.trim(),
         customer_address: document.getElementById("checkoutAddress").value.trim(),
         notes: document.getElementById("checkoutNotes").value.trim(),
-        discount_pct: discountPct,
-        shipping_fee: shippingFee,
-        items: items
+        discount_pct: parseFloat(document.getElementById("discountInput").value) || 0,
+        shipping_fee: parseFloat(document.getElementById("shippingInput").value) || 0,
+        items: cart.map(i => ({ product_id: i.id.startsWith("combo_") ? "" : i.id, name: i.name, unit_price: i.price, cost_price: i.cost_price || 0, qty: i.qty, details: (i.details || []).join("\n") })),
     };
-
-    const res = await fetch("/api/deals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || "Failed to create deal", "danger");
-        return;
-    }
-
+    const res = await fetch("/api/deals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) { showToast((await res.json()).error || "Lỗi tạo đơn", "danger"); return; }
     bootstrap.Modal.getInstance(document.getElementById("checkoutModal")).hide();
-    cart = [];
-    document.getElementById("discountInput").value = 0;
-    document.getElementById("shippingInput").value = 0;
-    renderCart();
-    showToast("Deal created! Status: Pending", "success");
+    cart = []; document.getElementById("discountInput").value = 0; document.getElementById("shippingInput").value = 0;
+    renderCart(); showToast("Đơn hàng đã tạo — Trạng thái: Chờ xử lý", "success");
     loadPendingCount();
 }
 
-function toggleView(view) {
-    const views = ["productsView", "shopView", "combosView", "customersView", "dealsView", "chatsView", "customTableView"];
-    const tabs = ["tabProducts", "tabShop", "tabCombos", "tabCustomers", "tabDeals", "tabChats", "tabCustomTable"];
-    views.forEach(v => document.getElementById(v).style.display = "none");
-    tabs.forEach(t => document.getElementById(t).classList.remove("active"));
-
-    if (view === "products") {
-        document.getElementById("productsView").style.display = "block";
-        document.getElementById("tabProducts").classList.add("active");
-        applyFilters();
-    } else if (view === "combos") {
-        document.getElementById("combosView").style.display = "block";
-        document.getElementById("tabCombos").classList.add("active");
-        loadCombos();
-    } else if (view === "deals") {
-        document.getElementById("dealsView").style.display = "block";
-        document.getElementById("tabDeals").classList.add("active");
-        loadDeals();
-    } else if (view === "customers") {
-        document.getElementById("customersView").style.display = "block";
-        document.getElementById("tabCustomers").classList.add("active");
-        loadCustomers();
-    } else if (view === "chats") {
-        document.getElementById("chatsView").style.display = "block";
-        document.getElementById("tabChats").classList.add("active");
-        loadChatCustomers();
-    } else if (view === "customTable") {
-        document.getElementById("customTableView").style.display = "block";
-        document.getElementById("tabCustomTable").classList.add("active");
-        loadCustomTableData();
-    } else {
-        document.getElementById("shopView").style.display = "block";
-        document.getElementById("tabShop").classList.add("active");
-        applyShopFilters();
-    }
-}
-
-// --- Chats ---
-
-let chatCustomers = [];
-
-async function loadChatCustomers() {
-    const res = await fetch("/api/customers");
-    chatCustomers = await res.json();
-    renderChatList();
-}
-
-function renderChatList() {
-    const container = document.getElementById("chatList");
-    const search = (document.getElementById("chatSearch").value || "").trim().toLowerCase();
-
-    let customers = chatCustomers.filter(c => c.customer_phone);
-    if (search) {
-        customers = customers.filter(c =>
-            c.customer_name.toLowerCase().includes(search) ||
-            c.customer_phone.includes(search)
-        );
-    }
-
-    if (customers.length === 0) {
-        container.innerHTML = `<div class="text-center py-5 text-muted">
-            <i class="bi bi-chat-dots fs-1 d-block mb-2"></i>
-            ${chatCustomers.length === 0 ? "No customers yet. Create a deal first!" : "No customers match your search."}
-        </div>`;
-        return;
-    }
-
-    container.innerHTML = `<div class="list-group shadow-sm rounded overflow-hidden">` +
-        customers.map(c => {
-            const initial = c.customer_name.charAt(0).toUpperCase();
-            const color = getPlaceholderColor(c.customer_name);
-            const activeBadge = c.active_deals > 0
-                ? `<span class="badge bg-primary">${c.active_deals} active</span>`
-                : `<span class="badge bg-secondary">no active deals</span>`;
-            return `
-            <div class="list-group-item d-flex align-items-center gap-3 py-3">
-                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                     style="width:42px;height:42px;background:${color};font-size:1rem">${initial}</div>
-                <div class="flex-grow-1 min-width-0">
-                    <div class="fw-semibold">${escapeHtml(c.customer_name)}</div>
-                    <div class="small text-muted"><i class="bi bi-telephone me-1"></i>${escapeHtml(c.customer_phone)} ${activeBadge}</div>
-                </div>
-                <div class="d-flex gap-2 flex-shrink-0">
-                    <a href="https://zalo.me/${encodeURIComponent(c.customer_phone)}" target="_blank"
-                       class="btn btn-primary btn-sm d-flex align-items-center gap-1">
-                        <i class="bi bi-chat-fill"></i> Zalo
-                    </a>
-                    <a href="tel:${encodeURIComponent(c.customer_phone)}"
-                       class="btn btn-outline-secondary btn-sm" title="Call">
-                        <i class="bi bi-telephone"></i>
-                    </a>
-                </div>
-            </div>`;
-        }).join("") + `</div>`;
-}
-
-// --- Custom Table Builder ---
-
-let woodTypes = [];
-let legTypes = [];
-
-async function loadCustomTableData() {
-    const [wRes, lRes] = await Promise.all([
-        fetch("/api/wood-types"),
-        fetch("/api/leg-types")
-    ]);
-    woodTypes = await wRes.json();
-    legTypes = await lRes.json();
-    populateCustomTableSelects();
-    renderWoodTypeList();
-    renderLegTypeList();
-}
-
-function populateCustomTableSelects() {
-    const ws = document.getElementById("ctWood");
-    const currentW = ws.value;
-    ws.innerHTML = '<option value="">Select wood type...</option>' +
-        woodTypes.map(w => `<option value="${w.id}" data-price="${w.price_per_m2}" data-cost="${w.cost_per_m2}">${escapeHtml(w.name)} — ${formatVND(w.price_per_m2)}/m²</option>`).join("");
-    if (currentW) ws.value = currentW;
-
-    const ls = document.getElementById("ctLegs");
-    const currentL = ls.value;
-    ls.innerHTML = '<option value="">No legs</option>' +
-        legTypes.map(l => `<option value="${l.id}" data-price="${l.price}" data-cost="${l.cost_price}">${escapeHtml(l.name)} — ${formatVND(l.price)}/leg</option>`).join("");
-    if (currentL) ls.value = currentL;
-}
-
-function addExtraRow() {
-    const container = document.getElementById("ctExtras");
-    const row = document.createElement("div");
-    row.className = "row g-2 mb-2 ct-extra-row";
-    row.innerHTML = `
-        <div class="col">
-            <input type="text" class="form-control form-control-sm ct-extra-name" placeholder="e.g., Finishing, Coating...">
-        </div>
-        <div class="col-4">
-            <input type="number" class="form-control form-control-sm ct-extra-price" placeholder="Fee (₫)" min="0" oninput="calcCustomTable()">
-        </div>
-        <div class="col-auto">
-            <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.ct-extra-row').remove();calcCustomTable()"><i class="bi bi-x-lg"></i></button>
-        </div>`;
-    container.appendChild(row);
-}
-
-function calcCustomTable() {
-    const summary = document.getElementById("ctSummary");
-    const length = parseFloat(document.getElementById("ctLength").value) || 0;
-    const width = parseFloat(document.getElementById("ctWidth").value) || 0;
-    const areaM2 = (length * width) / 10000;
-    document.getElementById("ctArea").value = areaM2 > 0 ? `${areaM2.toFixed(4)} m²` : "";
-
-    const ws = document.getElementById("ctWood");
-    const wOpt = ws.options[ws.selectedIndex];
-    const woodPriceM2 = ws.value ? parseFloat(wOpt.dataset.price) : 0;
-    const woodCostM2 = ws.value ? parseFloat(wOpt.dataset.cost) : 0;
-    const woodPrice = woodPriceM2 * areaM2;
-    const woodCost = woodCostM2 * areaM2;
-
-    const ls = document.getElementById("ctLegs");
-    const lOpt = ls.options[ls.selectedIndex];
-    const legQty = parseInt(document.getElementById("ctLegQty").value) || 0;
-    const legPriceEach = ls.value ? parseFloat(lOpt.dataset.price) : 0;
-    const legCostEach = ls.value ? parseFloat(lOpt.dataset.cost) : 0;
-    const legsPrice = legPriceEach * legQty;
-    const legsCost = legCostEach * legQty;
-
-    let extrasTotal = 0;
-    let extrasHtml = "";
-    document.querySelectorAll(".ct-extra-row").forEach(row => {
-        const name = row.querySelector(".ct-extra-name").value.trim() || "Extra";
-        const price = parseFloat(row.querySelector(".ct-extra-price").value) || 0;
-        if (price > 0) {
-            extrasTotal += price;
-            extrasHtml += `<div class="d-flex justify-content-between"><span class="text-muted">${escapeHtml(name)}</span><span>${formatVND(price)}</span></div>`;
-        }
-    });
-
-    const total = woodPrice + legsPrice + extrasTotal;
-    const costTotal = woodCost + legsCost;
-    const profit = total - costTotal;
-
-    if (!ws.value || areaM2 === 0) {
-        summary.innerHTML = `<div class="text-muted text-center py-3">Select wood and enter size to see pricing</div>`;
-        return;
-    }
-
-    summary.innerHTML = `
-        <div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-tree me-1"></i>${escapeHtml(wOpt.text.split(" —")[0])}</span>
-            <span class="fw-semibold">${formatVND(woodPrice)}</span>
-        </div>
-        <div class="small text-muted mb-2">${length}×${width}cm = ${areaM2.toFixed(4)}m² × ${formatVND(woodPriceM2)}/m²</div>
-        ${ls.value && legQty > 0 ? `<div class="d-flex justify-content-between mb-1">
-            <span><i class="bi bi-columns-gap me-1"></i>${escapeHtml(lOpt.text.split(" —")[0])} ×${legQty}</span>
-            <span class="fw-semibold">${formatVND(legsPrice)}</span>
-        </div>` : ""}
-        ${extrasHtml ? `<hr class="my-2">${extrasHtml}` : ""}
-        <hr class="my-2">
-        <div class="d-flex justify-content-between fs-5 fw-bold">
-            <span>Total</span>
-            <span class="text-success">${formatVND(total)}</span>
-        </div>
-        <div class="d-flex justify-content-between small mt-1 ${profit >= 0 ? 'text-success' : 'text-danger'}">
-            <span>Profit</span>
-            <span>${formatVND(profit)}</span>
-        </div>`;
-}
-
-function addCustomTableToCart() {
-    const name = document.getElementById("ctName").value.trim() || "Custom Table";
-    const length = parseFloat(document.getElementById("ctLength").value) || 0;
-    const width = parseFloat(document.getElementById("ctWidth").value) || 0;
-    const ws = document.getElementById("ctWood");
-    if (!ws.value || length === 0 || width === 0) {
-        showToast("Select wood type and enter size first", "danger");
-        return;
-    }
-
-    const areaM2 = (length * width) / 10000;
-    const wOpt = ws.options[ws.selectedIndex];
-    const woodPrice = parseFloat(wOpt.dataset.price) * areaM2;
-    const woodCost = parseFloat(wOpt.dataset.cost) * areaM2;
-
-    const ls = document.getElementById("ctLegs");
-    const lOpt = ls.options[ls.selectedIndex];
-    const legQty = parseInt(document.getElementById("ctLegQty").value) || 0;
-    const legsPrice = ls.value ? parseFloat(lOpt.dataset.price) * legQty : 0;
-    const legsCost = ls.value ? parseFloat(lOpt.dataset.cost) * legQty : 0;
-
-    let extrasTotal = 0;
-    document.querySelectorAll(".ct-extra-row").forEach(row => {
-        extrasTotal += parseFloat(row.querySelector(".ct-extra-price").value) || 0;
-    });
-
-    const total = woodPrice + legsPrice + extrasTotal;
-    const costTotal = woodCost + legsCost;
-    const cartId = `custom_${Date.now()}`;
-
-    cart.push({
-        id: cartId,
-        name: `[CUSTOM] ${name} (${length}×${width}cm)`,
-        price: total,
-        cost_price: costTotal,
-        qty: 1
-    });
-    renderCart();
-    showToast(`Custom table "${name}" added to cart`, "success");
-}
-
-// --- Wood & Leg Type Management ---
-
-function renderWoodTypeList() {
-    const list = document.getElementById("woodTypeList");
-    if (woodTypes.length === 0) {
-        list.innerHTML = `<div class="list-group-item text-center text-muted small py-3">No wood types yet</div>`;
-        return;
-    }
-    list.innerHTML = woodTypes.map(w => `
-        <div class="list-group-item d-flex align-items-center justify-content-between py-2">
-            <div>
-                <div class="fw-semibold small">${escapeHtml(w.name)}</div>
-                <div class="text-muted" style="font-size:0.75rem">${formatVND(w.price_per_m2)}/m² | Cost: ${formatVND(w.cost_per_m2)}/m²</div>
-            </div>
-            <div>
-                <button class="btn btn-sm btn-outline-primary border-0 p-1" onclick="showWoodModal('${w.id}')"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger border-0 p-1" onclick="deleteWoodType('${w.id}')"><i class="bi bi-trash"></i></button>
-            </div>
-        </div>`).join("");
-}
-
-function renderLegTypeList() {
-    const list = document.getElementById("legTypeList");
-    if (legTypes.length === 0) {
-        list.innerHTML = `<div class="list-group-item text-center text-muted small py-3">No leg types yet</div>`;
-        return;
-    }
-    list.innerHTML = legTypes.map(l => `
-        <div class="list-group-item d-flex align-items-center justify-content-between py-2">
-            <div>
-                <div class="fw-semibold small">${escapeHtml(l.name)}</div>
-                <div class="text-muted" style="font-size:0.75rem">${formatVND(l.price)}/leg | Cost: ${formatVND(l.cost_price)}/leg</div>
-            </div>
-            <div>
-                <button class="btn btn-sm btn-outline-primary border-0 p-1" onclick="showLegModal('${l.id}')"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger border-0 p-1" onclick="deleteLegType('${l.id}')"><i class="bi bi-trash"></i></button>
-            </div>
-        </div>`).join("");
-}
-
-function showWoodModal(id = null) {
-    document.getElementById("woodModalTitle").textContent = id ? "Edit Wood Type" : "Add Wood Type";
-    document.getElementById("woodId").value = id || "";
-    document.getElementById("woodName").value = "";
-    document.getElementById("woodPrice").value = "";
-    document.getElementById("woodCost").value = "";
-    document.getElementById("woodDesc").value = "";
-    if (id) {
-        const w = woodTypes.find(x => x.id === id);
-        if (w) {
-            document.getElementById("woodName").value = w.name;
-            document.getElementById("woodPrice").value = w.price_per_m2;
-            document.getElementById("woodCost").value = w.cost_per_m2;
-            document.getElementById("woodDesc").value = w.description || "";
-        }
-    }
-    new bootstrap.Modal(document.getElementById("woodModal")).show();
-}
-
-async function saveWoodType() {
-    const id = document.getElementById("woodId").value;
-    const body = {
-        name: document.getElementById("woodName").value.trim(),
-        price_per_m2: parseFloat(document.getElementById("woodPrice").value) || 0,
-        cost_per_m2: parseFloat(document.getElementById("woodCost").value) || 0,
-        description: document.getElementById("woodDesc").value.trim()
-    };
-    if (!body.name) { showToast("Name is required", "danger"); return; }
-    const url = id ? `/api/wood-types/${id}` : "/api/wood-types";
-    const method = id ? "PUT" : "POST";
-    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    bootstrap.Modal.getInstance(document.getElementById("woodModal")).hide();
-    showToast(id ? "Wood type updated" : "Wood type added", "success");
-    loadCustomTableData();
-}
-
-async function deleteWoodType(id) {
-    if (!confirm("Delete this wood type?")) return;
-    await fetch(`/api/wood-types/${id}`, { method: "DELETE" });
-    showToast("Wood type deleted", "success");
-    loadCustomTableData();
-}
-
-function showLegModal(id = null) {
-    document.getElementById("legModalTitle").textContent = id ? "Edit Leg Type" : "Add Leg Type";
-    document.getElementById("legId").value = id || "";
-    document.getElementById("legName").value = "";
-    document.getElementById("legPrice").value = "";
-    document.getElementById("legCostPrice").value = "";
-    document.getElementById("legDesc").value = "";
-    if (id) {
-        const l = legTypes.find(x => x.id === id);
-        if (l) {
-            document.getElementById("legName").value = l.name;
-            document.getElementById("legPrice").value = l.price;
-            document.getElementById("legCostPrice").value = l.cost_price;
-            document.getElementById("legDesc").value = l.description || "";
-        }
-    }
-    new bootstrap.Modal(document.getElementById("legModal")).show();
-}
-
-async function saveLegType() {
-    const id = document.getElementById("legId").value;
-    const body = {
-        name: document.getElementById("legName").value.trim(),
-        price: parseFloat(document.getElementById("legPrice").value) || 0,
-        cost_price: parseFloat(document.getElementById("legCostPrice").value) || 0,
-        description: document.getElementById("legDesc").value.trim()
-    };
-    if (!body.name) { showToast("Name is required", "danger"); return; }
-    const url = id ? `/api/leg-types/${id}` : "/api/leg-types";
-    const method = id ? "PUT" : "POST";
-    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    bootstrap.Modal.getInstance(document.getElementById("legModal")).hide();
-    showToast(id ? "Leg type updated" : "Leg type added", "success");
-    loadCustomTableData();
-}
-
-async function deleteLegType(id) {
-    if (!confirm("Delete this leg type?")) return;
-    await fetch(`/api/leg-types/${id}`, { method: "DELETE" });
-    showToast("Leg type deleted", "success");
-    loadCustomTableData();
-}
-
-// --- Combos ---
-
-let allCombos = [];
-let comboItems = [];
-
-async function loadCombos() {
-    const res = await fetch("/api/combos");
-    allCombos = await res.json();
-    renderCombos();
-}
-
-function renderCombos() {
-    const tbody = document.getElementById("comboTableBody");
-    if (allCombos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">
-            <i class="bi bi-collection fs-3 d-block mb-2"></i>No combos yet. Create one!</td></tr>`;
-        return;
-    }
-    tbody.innerHTML = allCombos.map(c => {
-        const saving = c.original_price - c.combo_price;
-        const savePct = c.original_price > 0 ? ((saving / c.original_price) * 100).toFixed(0) : 0;
-        const productList = c.items.map(i => `${i.product_name} ×${i.qty}`).join(", ");
-        return `<tr>
-            <td class="fw-bold">${escapeHtml(c.name)}</td>
-            <td class="small text-muted" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(productList)}</td>
-            <td class="text-end text-muted text-decoration-line-through">${formatVND(c.original_price)}</td>
-            <td class="text-end fw-semibold text-success">${formatVND(c.combo_price)}</td>
-            <td class="text-end"><span class="badge bg-danger">-${savePct}%</span> ${formatVND(saving)}</td>
-            <td class="text-center">
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCombo('${c.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteCombo('${c.id}')" title="Delete"><i class="bi bi-trash"></i></button>
-            </td>
-        </tr>`;
-    }).join("");
-}
-
-function showComboModal(comboId = null) {
-    document.getElementById("comboModalTitle").textContent = comboId ? "Edit Combo" : "Create Combo";
-    document.getElementById("comboId").value = comboId || "";
-    document.getElementById("comboName").value = "";
-    document.getElementById("comboPrice").value = "";
-    document.getElementById("comboDescription").value = "";
-    comboItems = [];
-
-    const select = document.getElementById("comboProductSelect");
-    select.innerHTML = '<option value="">Select a product...</option>' +
-        allProducts.map(p => `<option value="${p.id}" data-name="${escapeHtml(p.name)}" data-price="${p.price}" data-cost="${p.cost_price || 0}">${escapeHtml(p.name)} — ${formatVND(p.price)}</option>`).join("");
-
-    if (comboId) {
-        const combo = allCombos.find(c => c.id === comboId);
-        if (combo) {
-            document.getElementById("comboName").value = combo.name;
-            document.getElementById("comboPrice").value = combo.combo_price;
-            document.getElementById("comboDescription").value = combo.description || "";
-            comboItems = combo.items.map(i => ({
-                product_id: i.product_id,
-                product_name: i.product_name,
-                unit_price: i.unit_price,
-                cost_price: i.cost_price || 0,
-                qty: i.qty
-            }));
-        }
-    }
-
-    renderComboItems();
-    new bootstrap.Modal(document.getElementById("comboModal")).show();
-}
-
-function editCombo(comboId) {
-    showComboModal(comboId);
-}
-
-function addComboItem() {
-    const select = document.getElementById("comboProductSelect");
-    const opt = select.options[select.selectedIndex];
-    if (!select.value) return;
-
-    const qty = parseInt(document.getElementById("comboProductQty").value) || 1;
-    const existing = comboItems.find(i => i.product_id === select.value);
-    if (existing) {
-        existing.qty += qty;
-    } else {
-        comboItems.push({
-            product_id: select.value,
-            product_name: opt.dataset.name,
-            unit_price: parseFloat(opt.dataset.price),
-            cost_price: parseFloat(opt.dataset.cost) || 0,
-            qty: qty
-        });
-    }
-
-    select.value = "";
-    document.getElementById("comboProductQty").value = 1;
-    renderComboItems();
-}
-
-function removeComboItem(index) {
-    comboItems.splice(index, 1);
-    renderComboItems();
-}
-
-function renderComboItems() {
-    const tbody = document.getElementById("comboItemsBody");
-    if (comboItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No products added yet</td></tr>`;
-        document.getElementById("comboOriginalTotal").textContent = formatVND(0);
-        return;
-    }
-
-    let total = 0;
-    tbody.innerHTML = comboItems.map((item, idx) => {
-        const lineTotal = item.unit_price * item.qty;
-        total += lineTotal;
-        return `<tr>
-            <td>${escapeHtml(item.product_name)}</td>
-            <td class="text-center">${item.qty}</td>
-            <td class="text-end">${formatVND(item.unit_price)}</td>
-            <td class="text-end">${formatVND(lineTotal)}</td>
-            <td><button class="btn btn-sm btn-outline-danger border-0 p-0" onclick="removeComboItem(${idx})"><i class="bi bi-x-lg"></i></button></td>
-        </tr>`;
-    }).join("");
-    document.getElementById("comboOriginalTotal").textContent = formatVND(total);
-}
-
-async function saveCombo() {
-    const name = document.getElementById("comboName").value.trim();
-    const comboPrice = parseFloat(document.getElementById("comboPrice").value);
-    const description = document.getElementById("comboDescription").value.trim();
-    const comboId = document.getElementById("comboId").value;
-
-    if (!name) { showToast("Combo name is required", "danger"); return; }
-    if (!comboPrice || comboPrice <= 0) { showToast("Set a valid combo price", "danger"); return; }
-    if (comboItems.length < 1) { showToast("Add at least 1 product", "danger"); return; }
-
-    const body = { name, combo_price: comboPrice, description, items: comboItems };
-    const url = comboId ? `/api/combos/${comboId}` : "/api/combos";
-    const method = comboId ? "PUT" : "POST";
-
-    const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || "Failed to save combo", "danger");
-        return;
-    }
-
-    bootstrap.Modal.getInstance(document.getElementById("comboModal")).hide();
-    showToast(comboId ? "Combo updated" : "Combo created", "success");
-    loadCombos();
-    loadProducts();
-}
-
-async function deleteCombo(comboId) {
-    if (!confirm("Delete this combo?")) return;
-    await fetch(`/api/combos/${comboId}`, { method: "DELETE" });
-    showToast("Combo deleted", "success");
-    loadCombos();
-}
-
-// --- Customers ---
-
-let allCustomers = [];
-
-async function loadCustomers() {
-    const res = await fetch("/api/customers");
-    allCustomers = await res.json();
-    renderCustomers(allCustomers);
-}
-
-function filterCustomers() {
-    const search = document.getElementById("customerSearch").value.trim().toLowerCase();
-    if (!search) {
-        renderCustomers(allCustomers);
-        return;
-    }
-    const filtered = allCustomers.filter(c =>
-        c.customer_name.toLowerCase().includes(search) ||
-        (c.customer_phone || "").includes(search)
-    );
-    renderCustomers(filtered);
-}
-
-function renderCustomers(customers) {
-    const container = document.getElementById("customersList");
-    if (customers.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted py-5">
-            <i class="bi bi-people fs-1 d-block mb-2"></i>No customers yet. Create a deal to add customers.</div>`;
-        return;
-    }
-
-    container.innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle bg-white rounded shadow-sm">
-        <thead class="table-light">
-            <tr>
-                <th>Customer</th>
-                <th>Phone</th>
-                <th>Address</th>
-                <th class="text-center">Deals</th>
-                <th class="text-center">Active</th>
-                <th class="text-end">Total Spent</th>
-                <th>Last Deal</th>
-                <th class="text-center" style="width:180px">Actions</th>
-            </tr>
-        </thead>
-        <tbody>${customers.map(c => {
-            const date = c.last_deal_date ? new Date(c.last_deal_date).toLocaleDateString("vi-VN") : "—";
-            const nameEsc = escapeHtml(c.customer_name).replace(/'/g, "\\'");
-            return `<tr>
-                <td class="fw-bold" style="cursor:pointer" onclick="viewCustomerDeals('${nameEsc}')">${escapeHtml(c.customer_name)}</td>
-                <td>${c.customer_phone ? `${escapeHtml(c.customer_phone)} <a href="https://zalo.me/${c.customer_phone}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" title="Chat on Zalo"><i class="bi bi-chat-dots-fill"></i></a>` : '<span class="text-muted">—</span>'}</td>
-                <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.customer_address ? escapeHtml(c.customer_address) : '—'}</td>
-                <td class="text-center"><span class="badge bg-primary">${c.deal_count}</span></td>
-                <td class="text-center">${c.active_deals > 0 ? `<span class="badge bg-warning text-dark">${c.active_deals}</span>` : '<span class="text-muted">0</span>'}</td>
-                <td class="text-end fw-semibold text-success">${formatVND(c.total_spent)}</td>
-                <td class="text-muted small">${date}</td>
-                <td class="text-center">
-                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="viewCustomerDeals('${nameEsc}')" title="View Deals"><i class="bi bi-clipboard2-check"></i></button>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditCustomer('${nameEsc}')" title="Edit"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="showDeleteCustomer('${nameEsc}')" title="Delete"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>`;
-        }).join("")}</tbody></table></div>`;
-}
-
-function viewCustomerDeals(customerName) {
-    toggleView("deals");
-    document.getElementById("dealStatusFilter").value = "";
-    loadDeals(customerName);
-}
-
-function showEditCustomer(name) {
-    const cust = allCustomers.find(c => c.customer_name === name);
-    if (!cust) return;
-    document.getElementById("editCustOriginalName").value = cust.customer_name;
-    document.getElementById("editCustName").value = cust.customer_name;
-    document.getElementById("editCustPhone").value = cust.customer_phone || "";
-    document.getElementById("editCustAddress").value = cust.customer_address || "";
-    new bootstrap.Modal(document.getElementById("editCustomerModal")).show();
-}
-
-async function saveCustomer() {
-    const originalName = document.getElementById("editCustOriginalName").value;
-    const name = document.getElementById("editCustName").value.trim();
-    if (!name) {
-        showToast("Customer name is required", "danger");
-        return;
-    }
-
-    const res = await fetch("/api/customers/update", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            original_name: originalName,
-            customer_name: name,
-            customer_phone: document.getElementById("editCustPhone").value.trim(),
-            customer_address: document.getElementById("editCustAddress").value.trim()
-        })
-    });
-
-    if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || "Failed to update", "danger");
-        return;
-    }
-
-    bootstrap.Modal.getInstance(document.getElementById("editCustomerModal")).hide();
-    showToast("Customer updated", "success");
-    loadCustomers();
-}
-
-function showDeleteCustomer(name) {
-    document.getElementById("deleteCustName").textContent = name;
-    const modal = new bootstrap.Modal(document.getElementById("deleteCustomerModal"));
-    const btn = document.getElementById("confirmDeleteCustBtn");
-    btn.onclick = async () => {
-        const res = await fetch(`/api/customers/delete?name=${encodeURIComponent(name)}`, { method: "DELETE" });
-        if (res.ok) {
-            modal.hide();
-            showToast("Customer and all deals deleted", "success");
-            loadCustomers();
-            loadPendingCount();
-        } else {
-            showToast("Failed to delete customer", "danger");
-        }
-    };
-    modal.show();
-}
-
-async function loadDeals(customerName = null) {
-    const status = document.getElementById("dealStatusFilter").value;
+// ===== ORDERS =====
+async function loadDeals() {
+    const status = document.getElementById("dealStatusFilter")?.value || "";
     const url = status ? `/api/deals?status=${status}` : "/api/deals";
     const res = await fetch(url);
-    let deals = await res.json();
-    if (customerName) {
-        deals = deals.filter(d => d.customer_name.toLowerCase() === customerName.toLowerCase());
-    }
-    renderDeals(deals);
+    allDeals = await res.json();
+    renderDeals(allDeals);
+    loadOrderStats();
+}
+async function loadOrderStats() {
+    const res = await fetch("/api/deals/stats");
+    const s = await res.json();
+    document.getElementById("orderStats").innerHTML = `
+        <div class="stat-card"><div class="stat-label">Tổng đơn</div><div class="stat-value">${s.total_deals || 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Doanh thu</div><div class="stat-value">${formatVND(s.total_revenue || 0)}</div></div>
+        <div class="stat-card"><div class="stat-label">Lợi nhuận</div><div class="stat-value" style="color:var(--success)">${formatVND(s.total_profit || 0)}</div></div>
+    `;
+}
+function renderDeals(deals) {
+    const c = document.getElementById("dealsList");
+    if (deals.length === 0) { c.innerHTML = `<div class="empty-state"><i class="bi bi-receipt"></i><p>Không có đơn hàng nào</p></div>`; return; }
+    c.innerHTML = deals.map(d => {
+        const date = new Date(d.created_at).toLocaleDateString("vi-VN");
+        const items = d.items.map(i => i.product_name).join(", ");
+        return `<div class="deal-card" onclick="showDealDetail('${d.id}')">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="min-w-0">
+                    <div class="fw-600">${escapeHtml(d.customer_name || "Khách mới")}</div>
+                    <small class="text-muted">${d.customer_phone ? escapeHtml(d.customer_phone) + " · " : ""}${date}</small>
+                    <div class="text-muted mt-1" style="font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px">${escapeHtml(items)}</div>
+                </div>
+                <div class="text-end flex-shrink-0 ms-3">
+                    ${statusBadge(d.status)}
+                    <div class="fw-600 mt-1">${formatVND(d.total)}</div>
+                    <small class="text-muted">${d.items.length} SP</small>
+                </div>
+            </div>
+        </div>`;
+    }).join("");
 }
 
 async function loadPendingCount() {
     const res = await fetch("/api/deals?status=pending");
     const deals = await res.json();
-    const badge = document.getElementById("pendingCount");
-    if (deals.length > 0) {
-        badge.textContent = deals.length;
-        badge.style.display = "inline";
-    } else {
-        badge.style.display = "none";
-    }
+    const b = document.getElementById("pendingCount");
+    if (deals.length > 0) { b.textContent = deals.length; b.style.display = "inline"; }
+    else b.style.display = "none";
 }
-
-const STATUS_BADGE = {
-    pending: "bg-warning text-dark",
-    ongoing: "bg-primary",
-    returning: "bg-info text-dark",
-    done: "bg-success",
-    fail: "bg-danger"
-};
-
-function statusBadge(status) {
-    return STATUS_BADGE[status] || "bg-secondary";
-}
-
-function renderDeals(deals) {
-    const container = document.getElementById("dealsList");
-    if (deals.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted py-5">
-            <i class="bi bi-clipboard-x fs-1 d-block mb-2"></i>No deals found.</div>`;
-        return;
-    }
-
-    container.innerHTML = deals.map(d => {
-        const date = new Date(d.created_at).toLocaleDateString("vi-VN");
-        const itemNames = d.items.map(i => i.product_name).join(", ");
-        return `
-        <div class="deal-card mb-3" onclick="showDealDetail('${d.id}')">
-            <div class="d-flex justify-content-between align-items-start">
-                <div>
-                    <h6 class="mb-1 fw-bold">${escapeHtml(d.customer_name)}</h6>
-                    <small class="text-muted">${d.customer_phone ? escapeHtml(d.customer_phone) + ` <a href="https://zalo.me/${d.customer_phone}" target="_blank" class="text-primary" title="Zalo" onclick="event.stopPropagation()"><i class="bi bi-chat-dots-fill"></i></a> | ` : ""}${date}</small>
-                    <p class="mb-0 small text-muted mt-1" style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(itemNames)}</p>
-                </div>
-                <div class="text-end">
-                    <span class="badge ${statusBadge(d.status)} mb-1">${d.status.toUpperCase()}</span>
-                    <div class="fw-bold text-success">${formatVND(d.total)}</div>
-                    <small class="text-muted">${d.items.length} item(s)</small>
-                </div>
-            </div>
-        </div>`;
-    }).join("");
-}
-
-let allDeals = [];
 
 async function showDealDetail(dealId) {
-    const res = await fetch("/api/deals");
-    allDeals = await res.json();
-    const deal = allDeals.find(d => d.id === dealId);
-    if (!deal) return;
-
+    const res = await fetch(`/api/deals/${dealId}`);
+    const deal = await res.json();
+    if (deal.error) return;
     const date = new Date(deal.created_at).toLocaleDateString("vi-VN", { year: "numeric", month: "long", day: "numeric" });
+    const rows = deal.items.map(i => {
+        const detailsHtml = i.details ? `<div style="font-size:.7rem;color:var(--text-3);white-space:pre-line">${escapeHtml(i.details)}</div>` : "";
+        return `<tr><td>${escapeHtml(i.product_name)}${detailsHtml}</td><td class="text-center">${i.qty}</td><td class="text-end">${formatVND(i.unit_price)}</td><td class="text-end">${formatVND(i.line_total)}</td></tr>`;
+    }).join("");
 
-    const rows = deal.items.map(i => `<tr>
-        <td>${escapeHtml(i.product_name)}</td>
-        <td class="text-center">${i.qty}</td>
-        <td class="text-end">${formatVND(i.unit_price)}</td>
-        <td class="text-end">${formatVND(i.line_total)}</td>
-    </tr>`).join("");
+    const history = (deal.history || []).map(h => {
+        const t = new Date(h.changed_at).toLocaleString("vi-VN");
+        return `<div class="history-entry${h.new_status === deal.status ? " current" : ""}">
+            <div class="history-dot"></div>
+            <div class="history-time">${t}</div>
+            <div class="history-text">${statusBadge(h.old_status || "—")} → ${statusBadge(h.new_status)}</div>
+            ${h.note ? `<div class="history-note">${escapeHtml(h.note)}</div>` : ""}
+        </div>`;
+    }).join("");
 
     document.getElementById("dealDetailBody").innerHTML = `
         <div class="row mb-3">
             <div class="col-md-6">
-                <h6 class="text-muted mb-1">Customer</h6>
-                <p class="fw-bold mb-1">${escapeHtml(deal.customer_name)}</p>
-                ${deal.customer_phone ? `<p class="mb-1"><i class="bi bi-telephone me-1"></i>${escapeHtml(deal.customer_phone)} <a href="https://zalo.me/${deal.customer_phone}" target="_blank" class="btn btn-sm btn-primary py-0 px-2 ms-1"><i class="bi bi-chat-dots-fill me-1"></i>Zalo</a></p>` : ""}
-                ${deal.customer_address ? `<p class="mb-1"><i class="bi bi-geo-alt me-1"></i>${escapeHtml(deal.customer_address)}</p>` : ""}
-                ${deal.notes ? `<p class="mb-0 text-muted"><i class="bi bi-sticky me-1"></i>${escapeHtml(deal.notes)}</p>` : ""}
+                <div class="text-muted mb-1" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">Khách hàng</div>
+                <div class="fw-600">${escapeHtml(deal.customer_name || "Khách mới")}</div>
+                ${deal.customer_phone ? `<div class="text-muted" style="font-size:.82rem"><i class="bi bi-telephone me-1"></i>${escapeHtml(deal.customer_phone)} <a href="https://zalo.me/${deal.customer_phone}" target="_blank" class="btn btn-sm btn-primary py-0 px-2 ms-1"><i class="bi bi-chat-dots-fill me-1"></i>Zalo</a></div>` : ""}
+                ${deal.customer_address ? `<div class="text-muted" style="font-size:.82rem"><i class="bi bi-geo-alt me-1"></i>${escapeHtml(deal.customer_address)}</div>` : ""}
+                ${deal.notes ? `<div class="text-muted mt-1" style="font-size:.82rem"><i class="bi bi-sticky me-1"></i>${escapeHtml(deal.notes)}</div>` : ""}
             </div>
             <div class="col-md-6 text-md-end">
-                <span class="badge ${statusBadge(deal.status)} fs-6 mb-2">${deal.status.toUpperCase()}</span>
-                <p class="text-muted mb-0">${date}</p>
+                ${statusBadge(deal.status)}
+                <div class="text-muted mt-1" style="font-size:.82rem">${date}</div>
             </div>
         </div>
-        <table class="table table-bordered">
-            <thead class="table-light">
-                <tr>
-                    <th>Product</th>
-                    <th class="text-center" style="width:80px">Qty</th>
-                    <th class="text-end" style="width:120px">Unit Price</th>
-                    <th class="text-end" style="width:120px">Total</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="3" class="text-end fw-semibold">Subtotal</td>
-                    <td class="text-end fw-semibold">${formatVND(deal.subtotal)}</td>
-                </tr>
-                ${deal.discount_pct > 0 ? `<tr>
-                    <td colspan="3" class="text-end text-danger">Discount (${deal.discount_pct}%)</td>
-                    <td class="text-end text-danger">-${formatVND(deal.discount_amt)}</td>
-                </tr>` : ""}
-                ${(deal.shipping_fee || 0) > 0 ? `<tr>
-                    <td colspan="3" class="text-end"><i class="bi bi-truck me-1"></i>Shipping</td>
-                    <td class="text-end">${formatVND(deal.shipping_fee)}</td>
-                </tr>` : ""}
-                <tr class="table-primary">
-                    <td colspan="3" class="text-end fs-5 fw-bold">Total</td>
-                    <td class="text-end fs-5 fw-bold">${formatVND(deal.total)}</td>
-                </tr>
-            </tfoot>
-        </table>
-        <div class="profit-section p-2 rounded">
-            <div class="d-flex justify-content-between">
-                <span class="small"><i class="bi bi-lock-fill me-1"></i>Profit:</span>
-                <span class="fw-bold ${deal.profit >= 0 ? "text-success" : "text-danger"}">${formatVND(deal.profit)}</span>
-            </div>
-        </div>`;
+        <table class="table table-bordered"><thead class="table-light"><tr><th>Sản phẩm</th><th class="text-center" style="width:70px">SL</th><th class="text-end" style="width:110px">Đơn giá</th><th class="text-end" style="width:110px">Thành tiền</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+            <tr><td colspan="3" class="text-end fw-600">Tạm tính</td><td class="text-end fw-600">${formatVND(deal.subtotal)}</td></tr>
+            ${deal.discount_pct > 0 ? `<tr><td colspan="3" class="text-end text-danger">Giảm ${deal.discount_pct}%</td><td class="text-end text-danger">-${formatVND(deal.discount_amt)}</td></tr>` : ""}
+            ${(deal.shipping_fee || 0) > 0 ? `<tr><td colspan="3" class="text-end">Phí ship</td><td class="text-end">${formatVND(deal.shipping_fee)}</td></tr>` : ""}
+            <tr class="table-primary"><td colspan="3" class="text-end fw-bold">Tổng</td><td class="text-end fw-bold">${formatVND(deal.total)}</td></tr>
+        </tfoot></table>
+        <div class="profit-section p-2 rounded mb-3">
+            <div class="d-flex justify-content-between"><span class="small text-muted">Lợi nhuận:</span><span class="fw-600 ${deal.profit >= 0 ? "text-success" : "text-danger"}">${formatVND(deal.profit)}</span></div>
+        </div>
+        ${history ? `<div class="mb-2"><div class="text-muted mb-2" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">Lịch sử trạng thái</div><div class="history-timeline">${history}</div></div>` : ""}
+    `;
 
-    const statuses = ["pending", "ongoing", "returning", "done", "fail"];
-    const statusOptions = statuses.map(s =>
-        `<option value="${s}" ${s === deal.status ? "selected" : ""}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
-    ).join("");
-
-    const footer = document.getElementById("dealDetailFooter");
-    footer.innerHTML = `
-        <button class="btn btn-danger me-auto" onclick="deleteDeal('${deal.id}')"><i class="bi bi-trash me-1"></i>Delete</button>
+    const statuses = ["pending","confirmed","processing","shipping","delivered","completed","cancelled","returning","refunded"];
+    const opts = statuses.map(s => `<option value="${s}" ${s === deal.status ? "selected" : ""}>${STATUS_MAP[s]?.label || s}</option>`).join("");
+    document.getElementById("dealDetailFooter").innerHTML = `
+        <button class="btn btn-danger btn-sm me-auto" onclick="deleteDeal('${deal.id}')"><i class="bi bi-trash me-1"></i>Xoá</button>
         <div class="input-group" style="width:220px">
-            <label class="input-group-text">Status</label>
-            <select class="form-select" id="dealStatusSelect" onchange="updateDealStatus('${deal.id}', this.value)">
-                ${statusOptions}
-            </select>
+            <label class="input-group-text">Trạng thái</label>
+            <select class="form-select form-select-sm" onchange="updateDealStatus('${deal.id}',this.value)">${opts}</select>
         </div>`;
-
     new bootstrap.Modal(document.getElementById("dealDetailModal")).show();
 }
+async function updateDealStatus(id, status) {
+    await fetch(`/api/deals/${id}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
+    showToast("Đã cập nhật trạng thái", "success"); loadDeals(); loadPendingCount();
+}
+async function deleteDeal(id) {
+    if (!confirm("Xoá đơn hàng này?")) return;
+    await fetch(`/api/deals/${id}`, { method: "DELETE" });
+    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
+    showToast("Đã xoá đơn hàng", "success"); loadDeals(); loadPendingCount();
+}
 
-async function updateDealStatus(dealId, newStatus) {
-    await fetch(`/api/deals/${dealId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus })
+// ===== CUSTOMERS =====
+async function loadCustomers() {
+    const res = await fetch("/api/customers");
+    allCustomers = await res.json();
+    renderCustomers(allCustomers);
+}
+function filterCustomers() {
+    const q = (document.getElementById("customerSearch")?.value || "").trim().toLowerCase();
+    if (!q) { renderCustomers(allCustomers); return; }
+    renderCustomers(allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)));
+}
+function renderCustomers(customers) {
+    const c = document.getElementById("customersList");
+    if (customers.length === 0) { c.innerHTML = `<div class="empty-state"><i class="bi bi-people"></i><p>Chưa có khách hàng nào</p></div>`; return; }
+    c.innerHTML = customers.map(cu => {
+        const color = avatarColor(cu.name);
+        const initial = cu.name.charAt(0).toUpperCase();
+        const date = cu.last_order_date ? new Date(cu.last_order_date).toLocaleDateString("vi-VN") : "—";
+        return `<div class="customer-item">
+            <div class="customer-avatar" style="background:${color}">${initial}</div>
+            <div class="customer-info min-w-0">
+                <div class="customer-name">${escapeHtml(cu.name)}</div>
+                <div class="customer-meta">
+                    ${cu.phone ? `<i class="bi bi-telephone me-1"></i>${escapeHtml(cu.phone)}` : ""}
+                    ${cu.total_orders ? ` · ${cu.total_orders} đơn` : ""}
+                    ${cu.total_spent ? ` · ${formatVND(cu.total_spent)}` : ""}
+                    ${date !== "—" ? ` · ${date}` : ""}
+                </div>
+            </div>
+            <div class="customer-actions">
+                ${cu.phone ? `<a href="https://zalo.me/${cu.phone}" target="_blank" class="btn btn-sm btn-primary" title="Zalo"><i class="bi bi-chat-dots-fill"></i></a>
+                <a href="tel:${cu.phone}" class="btn btn-sm btn-outline-secondary" title="Gọi"><i class="bi bi-telephone"></i></a>` : ""}
+                <button class="btn btn-sm btn-outline-primary" onclick="showEditCustomer('${cu.id}')" title="Sửa"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="showDeleteCustomer('${cu.id}','${escapeHtml(cu.name).replace(/'/g,"\\'")}')" title="Xoá"><i class="bi bi-trash"></i></button>
+            </div>
+        </div>`;
+    }).join("");
+}
+function showAddCustomerModal() {
+    document.getElementById("addCustomerModalTitle").textContent = "Thêm khách hàng";
+    document.getElementById("editCustId").value = "";
+    document.getElementById("editCustName").value = "";
+    document.getElementById("editCustPhone").value = "";
+    document.getElementById("editCustAddress").value = "";
+    document.getElementById("editCustNotes").value = "";
+    new bootstrap.Modal(document.getElementById("addCustomerModal")).show();
+}
+function showEditCustomer(id) {
+    const c = allCustomers.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById("addCustomerModalTitle").textContent = "Sửa khách hàng";
+    document.getElementById("editCustId").value = c.id;
+    document.getElementById("editCustName").value = c.name;
+    document.getElementById("editCustPhone").value = c.phone || "";
+    document.getElementById("editCustAddress").value = c.address || "";
+    document.getElementById("editCustNotes").value = c.notes || "";
+    new bootstrap.Modal(document.getElementById("addCustomerModal")).show();
+}
+async function saveCustomer() {
+    const id = document.getElementById("editCustId").value;
+    const name = document.getElementById("editCustName").value.trim();
+    if (!name) { showToast("Tên khách hàng là bắt buộc", "danger"); return; }
+    const body = { name, phone: document.getElementById("editCustPhone").value.trim(), address: document.getElementById("editCustAddress").value.trim(), notes: document.getElementById("editCustNotes").value.trim() };
+    const url = id ? `/api/customers/${id}` : "/api/customers";
+    const res = await fetch(url, { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) { showToast((await res.json()).error || "Lỗi", "danger"); return; }
+    bootstrap.Modal.getInstance(document.getElementById("addCustomerModal")).hide();
+    showToast(id ? "Đã cập nhật" : "Đã thêm khách hàng", "success"); loadCustomers();
+}
+function showDeleteCustomer(id, name) {
+    document.getElementById("deleteCustName").textContent = name;
+    const modal = new bootstrap.Modal(document.getElementById("deleteCustomerModal"));
+    document.getElementById("confirmDeleteCustBtn").onclick = async () => {
+        const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
+        if (res.ok) { modal.hide(); showToast("Đã xoá khách hàng", "success"); loadCustomers(); }
+    };
+    modal.show();
+}
+
+// ===== COMBOS =====
+let comboItems = [];
+async function loadCombos() {
+    const res = await fetch("/api/combos");
+    allCombos = await res.json();
+    renderCombos();
+}
+function renderCombos() {
+    const tbody = document.getElementById("comboTableBody");
+    if (allCombos.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-collection fs-3 d-block mb-2"></i>Chưa có gói nào</td></tr>`; return; }
+    tbody.innerHTML = allCombos.map(c => {
+        const saving = c.original_price - c.combo_price;
+        const pct = c.original_price > 0 ? ((saving / c.original_price) * 100).toFixed(0) : 0;
+        const items = c.items.map(i => `${i.product_name} ×${i.qty}`).join(", ");
+        return `<tr>
+            <td class="fw-600">${escapeHtml(c.name)}</td>
+            <td class="text-muted" style="font-size:.78rem;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(items)}</td>
+            <td class="text-end text-muted text-decoration-line-through">${formatVND(c.original_price)}</td>
+            <td class="text-end fw-600">${formatVND(c.combo_price)}</td>
+            <td class="text-end"><span class="badge-status badge-cancelled">-${pct}%</span> ${formatVND(saving)}</td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCombo('${c.id}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteCombo('${c.id}')"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+function showComboModal(comboId = null) {
+    document.getElementById("comboModalTitle").textContent = comboId ? "Sửa gói" : "Tạo gói sản phẩm";
+    document.getElementById("comboId").value = comboId || "";
+    document.getElementById("comboName").value = "";
+    document.getElementById("comboPrice").value = "";
+    document.getElementById("comboDescription").value = "";
+    comboItems = [];
+    document.getElementById("comboProductSelect").innerHTML = '<option value="">Chọn sản phẩm...</option>' +
+        allProducts.map(p => `<option value="${p.id}" data-name="${escapeHtml(p.name)}" data-price="${p.price}" data-cost="${p.cost_price || 0}">${escapeHtml(p.name)} — ${formatVND(p.price)}</option>`).join("");
+    if (comboId) {
+        const c = allCombos.find(x => x.id === comboId);
+        if (c) {
+            document.getElementById("comboName").value = c.name;
+            document.getElementById("comboPrice").value = c.combo_price;
+            document.getElementById("comboDescription").value = c.description || "";
+            comboItems = c.items.map(i => ({ product_id: i.product_id, product_name: i.product_name, unit_price: i.unit_price, cost_price: i.cost_price || 0, qty: i.qty }));
+        }
+    }
+    renderComboItems();
+    new bootstrap.Modal(document.getElementById("comboModal")).show();
+}
+function editCombo(id) { showComboModal(id); }
+function addComboItem() {
+    const sel = document.getElementById("comboProductSelect");
+    const opt = sel.options[sel.selectedIndex];
+    if (!sel.value) return;
+    const qty = parseInt(document.getElementById("comboProductQty").value) || 1;
+    const ex = comboItems.find(i => i.product_id === sel.value);
+    if (ex) ex.qty += qty;
+    else comboItems.push({ product_id: sel.value, product_name: opt.dataset.name, unit_price: parseFloat(opt.dataset.price), cost_price: parseFloat(opt.dataset.cost) || 0, qty });
+    sel.value = ""; document.getElementById("comboProductQty").value = 1; renderComboItems();
+}
+function removeComboItem(idx) { comboItems.splice(idx, 1); renderComboItems(); }
+function renderComboItems() {
+    const tbody = document.getElementById("comboItemsBody");
+    if (comboItems.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Chưa thêm sản phẩm</td></tr>`; document.getElementById("comboOriginalTotal").textContent = "0₫"; return; }
+    let total = 0;
+    tbody.innerHTML = comboItems.map((item, idx) => { const l = item.unit_price * item.qty; total += l; return `<tr><td>${escapeHtml(item.product_name)}</td><td class="text-center">${item.qty}</td><td class="text-end">${formatVND(item.unit_price)}</td><td class="text-end">${formatVND(l)}</td><td><button class="btn btn-sm p-0 border-0 text-danger" onclick="removeComboItem(${idx})"><i class="bi bi-x-lg"></i></button></td></tr>`; }).join("");
+    document.getElementById("comboOriginalTotal").textContent = formatVND(total);
+}
+async function saveCombo() {
+    const name = document.getElementById("comboName").value.trim();
+    const price = parseFloat(document.getElementById("comboPrice").value);
+    const desc = document.getElementById("comboDescription").value.trim();
+    const id = document.getElementById("comboId").value;
+    if (!name) { showToast("Tên gói là bắt buộc", "danger"); return; }
+    if (!price || price <= 0) { showToast("Nhập giá gói hợp lệ", "danger"); return; }
+    if (comboItems.length < 1) { showToast("Thêm ít nhất 1 sản phẩm", "danger"); return; }
+    const res = await fetch(id ? `/api/combos/${id}` : "/api/combos", { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, combo_price: price, description: desc, items: comboItems }) });
+    if (!res.ok) { showToast((await res.json()).error || "Lỗi", "danger"); return; }
+    bootstrap.Modal.getInstance(document.getElementById("comboModal")).hide();
+    showToast(id ? "Đã cập nhật gói" : "Đã tạo gói", "success"); loadCombos(); loadProducts();
+}
+async function deleteCombo(id) {
+    if (!confirm("Xoá gói này?")) return;
+    await fetch(`/api/combos/${id}`, { method: "DELETE" });
+    showToast("Đã xoá gói", "success"); loadCombos();
+}
+
+// ===== CUSTOM TABLE (BAO GIA) =====
+const PAINT_FEE = 500000;
+const WIDTH_PRICING = { 60: 55000000, 70: 80000000, 75: 85000000, 80: 90000000, 90: 100000000, 100: 110000000 };
+const READY_MADE_DISCOUNT = 0.85;
+let allCategories = [];
+
+function getUnitPriceByWidth(widthCm) {
+    const keys = Object.keys(WIDTH_PRICING).map(Number).sort((a, b) => a - b);
+    for (const k of keys) { if (widthCm <= k) return WIDTH_PRICING[k]; }
+    return WIDTH_PRICING[keys[keys.length - 1]];
+}
+
+async function loadCustomTableData() {
+    const [cRes] = await Promise.all([fetch("/api/categories")]);
+    allCategories = await cRes.json();
+    if (allProducts.length === 0) { const pRes = await fetch("/api/products"); allProducts = await pRes.json(); }
+    populateCustomTableSelects();
+    initChairRows();
+}
+
+function populateCustomTableSelects() {
+    const ls = document.getElementById("ctLegs");
+    const cl = ls.value;
+    const legProducts = allProducts.filter(p => (p.category || "").toLowerCase() === "chân bàn");
+    ls.innerHTML = '<option value="">Không có chân</option>' + legProducts.map(p => `<option value="${p.id}" data-price="${p.price}" data-cost="${p.cost_price || 0}">${escapeHtml(p.name)} — ${formatVND(p.price)}/cái</option>`).join("");
+    if (cl) ls.value = cl;
+    // Update existing chair rows with current product list
+    updateAllChairSelects();
+}
+
+let chairRowCount = 0;
+function initChairRows() {
+    document.getElementById("ctChairRows").innerHTML = "";
+    chairRowCount = 0;
+    addChairRow();
+}
+function addChairRow() {
+    const id = chairRowCount++;
+    const chairProducts = allProducts.filter(p => (p.category || "").toLowerCase() === "ghế");
+    const options = '<option value="">Chọn ghế...</option>' + chairProducts.map(p => `<option value="${p.id}" data-price="${p.price}" data-cost="${p.cost_price || 0}">${escapeHtml(p.name)} — ${formatVND(p.price)}</option>`).join("");
+    const row = document.createElement("div");
+    row.className = "row g-2 mb-2 ct-chair-row";
+    row.dataset.rowId = id;
+    row.innerHTML = `
+        <div class="col"><select class="form-select form-select-sm ct-chair-select" onchange="calcCustomTable()">${options}</select></div>
+        <div class="col-3"><input type="number" class="form-control form-control-sm ct-chair-qty" min="1" value="1" placeholder="SL" oninput="calcCustomTable()"></div>
+        <div class="col-auto"><button class="btn btn-sm btn-outline-danger" onclick="removeChairRow(${id})"><i class="bi bi-x-lg"></i></button></div>`;
+    document.getElementById("ctChairRows").appendChild(row);
+}
+function removeChairRow(id) {
+    const rows = document.querySelectorAll(".ct-chair-row");
+    if (rows.length <= 1) { showToast("Cần ít nhất 1 dòng ghế", "danger"); return; }
+    document.querySelector(`.ct-chair-row[data-row-id="${id}"]`)?.remove();
+    calcCustomTable();
+}
+function updateAllChairSelects() {
+    const chairProducts = allProducts.filter(p => (p.category || "").toLowerCase() === "ghế");
+    const options = '<option value="">Chọn ghế...</option>' + chairProducts.map(p => `<option value="${p.id}" data-price="${p.price}" data-cost="${p.cost_price || 0}">${escapeHtml(p.name)} — ${formatVND(p.price)}</option>`).join("");
+    document.querySelectorAll(".ct-chair-select").forEach(sel => { sel.innerHTML = options; });
+}
+function getChairData() {
+    const result = [];
+    document.querySelectorAll(".ct-chair-row").forEach(row => {
+        const sel = row.querySelector(".ct-chair-select");
+        const qty = parseInt(row.querySelector(".ct-chair-qty").value) || 0;
+        if (sel.value && qty > 0) {
+            const opt = sel.options[sel.selectedIndex];
+            result.push({ name: opt.text.split(" —")[0], price: parseFloat(opt.dataset.price) || 0, cost: parseFloat(opt.dataset.cost) || 0, qty });
+        }
     });
-    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
-    showToast(`Deal status: ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`, "success");
-    loadDeals();
-    loadPendingCount();
+    return result;
 }
 
-async function deleteDeal(dealId) {
-    if (!confirm("Delete this deal?")) return;
-    await fetch(`/api/deals/${dealId}`, { method: "DELETE" });
-    bootstrap.Modal.getInstance(document.getElementById("dealDetailModal")).hide();
-    showToast("Deal deleted", "success");
-    loadDeals();
-    loadPendingCount();
+function addExtraRow() {
+    const c = document.getElementById("ctExtras");
+    const r = document.createElement("div"); r.className = "row g-2 mb-2 ct-extra-row";
+    r.innerHTML = `<div class="col"><input type="text" class="form-control form-control-sm ct-extra-name" placeholder="Tên phí..."></div><div class="col-4"><input type="number" class="form-control form-control-sm ct-extra-price" placeholder="Giá" min="0" oninput="calcCustomTable()"></div><div class="col-auto"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('.ct-extra-row').remove();calcCustomTable()"><i class="bi bi-x-lg"></i></button></div>`;
+    c.appendChild(r);
 }
 
-function renderCart() {
-    const body = document.getElementById("cartBody");
-    const footer = document.getElementById("cartFooter");
-    const countBadge = document.getElementById("cartCount");
-    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
-    countBadge.textContent = totalItems;
+function calcCustomTable() {
+    const summary = document.getElementById("ctSummary");
+    const l = parseFloat(document.getElementById("ctLength").value) || 0;
+    const w = parseFloat(document.getElementById("ctWidth").value) || 0;
+    const t = parseFloat(document.getElementById("ctThickness").value) || 0;
+    const isReadyMade = document.getElementById("ctReadyMade").checked;
+    const volumeM3 = (l / 100) * (w / 100) * (t / 100);
+    document.getElementById("ctVolume").value = volumeM3 > 0 ? `${volumeM3.toFixed(6)} m³` : "";
 
-    if (cart.length === 0) {
-        body.innerHTML = `
-            <div class="text-center text-muted py-5">
-                <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-                Cart is empty. Add products to start a deal.
-            </div>`;
-        footer.style.display = "none";
+    const unitPrice = w > 0 ? getUnitPriceByWidth(w) : 0;
+    const tablePrice = volumeM3 * unitPrice;
+    const paintFee = isReadyMade ? 0 : PAINT_FEE;
+    const discount = isReadyMade ? tablePrice * (1 - READY_MADE_DISCOUNT) : 0;
+    const tableAfterDiscount = tablePrice - discount;
+
+    const ls = document.getElementById("ctLegs"); const lo = ls.options[ls.selectedIndex];
+    const lq = parseInt(document.getElementById("ctLegQty").value) || 0;
+    const legPrice = ls.value ? parseFloat(lo.dataset.price) * lq : 0;
+    const legCost = ls.value ? parseFloat(lo.dataset.cost) * lq : 0;
+
+    const chairs = getChairData();
+    let chairsTotal = 0, chairsCost = 0;
+    chairs.forEach(c => { chairsTotal += c.price * c.qty; chairsCost += c.cost * c.qty; });
+
+    let extras = 0, extrasHtml = "";
+    document.querySelectorAll(".ct-extra-row").forEach(r => {
+        const n = r.querySelector(".ct-extra-name").value.trim() || "Phí";
+        const p = parseFloat(r.querySelector(".ct-extra-price").value) || 0;
+        if (p > 0) { extras += p; extrasHtml += `<div class="d-flex justify-content-between"><span class="text-muted">${escapeHtml(n)}</span><span>${formatVND(p)}</span></div>`; }
+    });
+
+    const total = tableAfterDiscount + paintFee + legPrice + chairsTotal + extras;
+    const costTotal = legCost + chairsCost;
+    const profit = total - costTotal;
+
+    if (l === 0 || w === 0 || t === 0) {
+        summary.innerHTML = `<div class="text-muted text-center py-3" style="font-size:.82rem">Nhập đầy đủ kích thước (dài, rộng, dày)</div>`;
         return;
     }
 
-    footer.style.display = "block";
-    let subtotalSum = 0;
-    let costSum = 0;
-    body.innerHTML = cart
-        .map((item) => {
-            const subtotal = item.price * item.qty;
-            subtotalSum += subtotal;
-            costSum += (item.cost_price || 0) * item.qty;
-            return `
-            <div class="cart-item">
-                <div class="d-flex justify-content-between align-items-start mb-1">
-                    <strong class="me-2">${escapeHtml(item.name)}</strong>
-                    <button class="btn btn-sm btn-outline-danger border-0 p-0" onclick="removeFromCart('${item.id}')" title="Remove">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="input-group input-group-sm" style="width:120px">
-                        <button class="btn btn-outline-secondary" onclick="updateCartQty('${item.id}', -1)">−</button>
-                        <input type="number" class="form-control text-center" value="${item.qty}" min="1"
-                               onchange="setCartQty('${item.id}', this.value)" style="max-width:50px">
-                        <button class="btn btn-outline-secondary" onclick="updateCartQty('${item.id}', 1)">+</button>
-                    </div>
-                    <span class="text-success fw-semibold">${formatVND(subtotal)}</span>
-                </div>
-                <small class="text-muted">${formatVND(item.price)} each</small>
-            </div>`;
-        })
-        .join("");
+    let html = `
+        <div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">Thể tích</span><span class="fw-600">${volumeM3.toFixed(6)} m³</span></div>
+        <div class="text-muted mb-2" style="font-size:.72rem">${l}×${w}×${t}cm · Đơn giá ${formatVND(unitPrice)}/m³</div>
+        <div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">Bàn gỗ</span><span class="fw-600">${formatVND(tablePrice)}</span></div>`;
+    if (isReadyMade) html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem;color:var(--danger)">Giảm bàn có sẵn (-15%)</span><span class="text-danger fw-600">-${formatVND(discount)}</span></div>`;
+    if (!isReadyMade) html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">Phí sơn</span><span class="fw-600">${formatVND(paintFee)}</span></div>`;
+    if (legPrice > 0) html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">${escapeHtml(lo.text.split(" —")[0])} ×${lq}</span><span class="fw-600">${formatVND(legPrice)}</span></div>`;
+    chairs.forEach(c => { html += `<div class="d-flex justify-content-between mb-1"><span style="font-size:.82rem">${escapeHtml(c.name)} ×${c.qty}</span><span class="fw-600">${formatVND(c.price * c.qty)}</span></div>`; });
+    if (extrasHtml) html += `<hr class="my-1">${extrasHtml}`;
+    html += `
+        <hr class="my-1">
+        <div class="d-flex justify-content-between"><span class="fw-bold">TỔNG CỘNG</span><span class="fw-bold text-success" style="font-size:1.1rem">${formatVND(total)}</span></div>
+        <div class="d-flex justify-content-between" style="font-size:.78rem"><span class="text-muted">Lợi nhuận</span><span class="${profit >= 0 ? "text-success" : "text-danger"} fw-600">${formatVND(profit)}</span></div>`;
+    if (isReadyMade) html += `<div class="mt-2 p-2 rounded" style="background:var(--warning-bg);font-size:.75rem"><i class="bi bi-info-circle me-1"></i>Bàn có sẵn: miễn phí sơn, giảm 15%</div>`;
+    summary.innerHTML = html;
+}
 
-    const discountPct = parseFloat(document.getElementById("discountInput").value) || 0;
-    const discountAmt = subtotalSum * (discountPct / 100);
-    const shippingFee = parseFloat(document.getElementById("shippingInput").value) || 0;
-    const finalTotal = subtotalSum - discountAmt + shippingFee;
-    const profit = finalTotal - costSum - shippingFee;
-    const margin = finalTotal > 0 ? (profit / finalTotal) * 100 : 0;
+function addCustomTableToCart() {
+    const name = document.getElementById("ctName").value.trim() || "Sản phẩm tùy chỉnh";
+    const l = parseFloat(document.getElementById("ctLength").value) || 0;
+    const w = parseFloat(document.getElementById("ctWidth").value) || 0;
+    const t = parseFloat(document.getElementById("ctThickness").value) || 0;
+    if (l === 0 || w === 0 || t === 0) { showToast("Nhập đầy đủ kích thước (dài, rộng, dày)", "danger"); return; }
 
-    document.getElementById("cartItemCount").textContent = totalItems;
-    document.getElementById("cartSubtotal").textContent = formatVND(subtotalSum);
+    const isReadyMade = document.getElementById("ctReadyMade").checked;
+    const volumeM3 = (l / 100) * (w / 100) * (t / 100);
+    const unitPrice = getUnitPriceByWidth(w);
+    const tablePrice = volumeM3 * unitPrice;
+    const discount = isReadyMade ? tablePrice * (1 - READY_MADE_DISCOUNT) : 0;
+    const paintFee = isReadyMade ? 0 : PAINT_FEE;
 
-    const discountRow = document.getElementById("discountRow");
-    if (discountPct > 0) {
-        discountRow.style.display = "flex";
-        discountRow.style.setProperty("display", "flex", "important");
-        document.getElementById("cartDiscount").textContent = `-${formatVND(discountAmt)}`;
-    } else {
-        discountRow.style.setProperty("display", "none", "important");
-    }
+    const ls = document.getElementById("ctLegs"); const lo = ls.options[ls.selectedIndex];
+    const lq = parseInt(document.getElementById("ctLegQty").value) || 0;
+    const legPrice = ls.value ? parseFloat(lo.dataset.price) * lq : 0;
+    const legCost = ls.value ? parseFloat(lo.dataset.cost) * lq : 0;
+    const legName = ls.value ? lo.text.split(" —")[0] : "";
 
-    document.getElementById("cartTotal").textContent = formatVND(finalTotal);
-    document.getElementById("cartProfit").textContent = formatVND(profit);
-    document.getElementById("cartProfit").className = `fw-bold ${profit >= 0 ? "text-success" : "text-danger"}`;
-    document.getElementById("cartMargin").textContent = `${margin.toFixed(1)}%`;
-    document.getElementById("cartMargin").className = `fw-semibold small ${profit >= 0 ? "text-success" : "text-danger"}`;
+    const chairs = getChairData();
+    let chairsTotal = 0, chairsCost = 0;
+    chairs.forEach(c => { chairsTotal += c.price * c.qty; chairsCost += c.cost * c.qty; });
+
+    let extrasList = [];
+    let extras = 0;
+    document.querySelectorAll(".ct-extra-row").forEach(r => {
+        const n = r.querySelector(".ct-extra-name").value.trim() || "Phí";
+        const p = parseFloat(r.querySelector(".ct-extra-price").value) || 0;
+        if (p > 0) { extras += p; extrasList.push({ name: n, price: p }); }
+    });
+
+    const total = (tablePrice - discount) + paintFee + legPrice + chairsTotal + extras;
+    const costTotal = legCost + chairsCost;
+    const tag = isReadyMade ? "CÓ SẴN" : "TÙY CHỈNH";
+
+    const details = [];
+    details.push(`Kích thước: ${l}×${w}×${t}cm`);
+    if (legName && lq > 0) details.push(`Chân: ${legName} ×${lq}`);
+    chairs.forEach(c => details.push(`Ghế: ${c.name} ×${c.qty}`));
+    extrasList.forEach(e => details.push(`${e.name}: ${formatVND(e.price)}`));
+    if (isReadyMade) details.push("Bàn có sẵn: miễn sơn, giảm 15%");
+
+    cart.push({
+        id: `custom_${Date.now()}`,
+        name: `[${tag}] ${name}`,
+        price: total,
+        cost_price: costTotal,
+        qty: 1,
+        details: details
+    });
+    renderCart(); showToast(`Đã thêm "${name}" vào giỏ`, "success");
+}
+
+// ===== CATEGORIES =====
+async function loadCategories() {
+    const res = await fetch("/api/categories");
+    allCategories = await res.json();
+    renderCategories();
+    populateCategoryFilter();
+    populateShopCategoryFilter();
+}
+function renderCategories() {
+    const tbody = document.getElementById("categoryTableBody");
+    if (allCategories.length === 0) { tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4"><i class="bi bi-tag fs-3 d-block mb-2"></i>Chưa có danh mục nào</td></tr>`; return; }
+    tbody.innerHTML = allCategories.map(c => `<tr>
+        <td class="fw-600">${escapeHtml(c.name)}</td>
+        <td class="text-center text-muted">${c.sort_order || 0}</td>
+        <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="showEditCategory('${c.id}')"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory('${c.id}','${escapeHtml(c.name).replace(/'/g,"\\'")}')"><i class="bi bi-trash"></i></button>
+        </td>
+    </tr>`).join("");
+}
+function showAddCategoryModal() {
+    document.getElementById("categoryModalTitle").textContent = "Thêm danh mục";
+    document.getElementById("categoryId").value = "";
+    document.getElementById("categoryName").value = "";
+    document.getElementById("categorySort").value = "0";
+    new bootstrap.Modal(document.getElementById("categoryModal")).show();
+}
+function showEditCategory(id) {
+    const c = allCategories.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById("categoryModalTitle").textContent = "Sửa danh mục";
+    document.getElementById("categoryId").value = c.id;
+    document.getElementById("categoryName").value = c.name;
+    document.getElementById("categorySort").value = c.sort_order || 0;
+    new bootstrap.Modal(document.getElementById("categoryModal")).show();
+}
+async function saveCategory() {
+    const id = document.getElementById("categoryId").value;
+    const name = document.getElementById("categoryName").value.trim();
+    if (!name) { showToast("Tên danh mục là bắt buộc", "danger"); return; }
+    const body = { name, sort_order: parseInt(document.getElementById("categorySort").value) || 0 };
+    const url = id ? `/api/categories/${id}` : "/api/categories";
+    const res = await fetch(url, { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) { showToast((await res.json()).error || "Lỗi", "danger"); return; }
+    bootstrap.Modal.getInstance(document.getElementById("categoryModal")).hide();
+    showToast(id ? "Đã cập nhật" : "Đã thêm danh mục", "success");
+    await loadCategories();
+    populateCategoryFilter();
+    populateShopCategoryFilter();
+}
+async function deleteCategory(id, name) {
+    if (!confirm(`Xoá danh mục "${name}"?`)) return;
+    await fetch(`/api/categories/${id}`, { method: "DELETE" });
+    showToast("Đã xoá", "success");
+    await loadCategories();
+}
+
+// ===== TOAST =====
+function showToast(msg, type = "success") {
+    const t = document.getElementById("appToast");
+    const b = document.getElementById("toastBody");
+    const icon = type === "success" ? "bi-check-circle-fill" : "bi-exclamation-circle-fill";
+    t.className = `toast bg-${type} text-white`;
+    b.innerHTML = `<i class="bi ${icon} me-2"></i>${msg}`;
+    new bootstrap.Toast(t, { delay: 3000 }).show();
 }

@@ -1,119 +1,125 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+<html lang="vi" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Manager</title>
+    <title>POS - Quản lý Bán hàng</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="/static/css/style.css" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-        <div class="container-fluid px-4">
-            <a class="navbar-brand fw-bold" href="#" onclick="toggleView('shop')">
-                <i class="bi bi-grid-1x2-fill me-2"></i>Dashboard
-            </a>
-            <div class="d-flex align-items-center gap-1">
-                <button class="btn btn-sm nav-tab-btn active" id="tabShop" onclick="toggleView('shop')">
-                    <i class="bi bi-shop me-1"></i>Shop
-                </button>
-                <button class="btn btn-sm nav-tab-btn" id="tabProducts" onclick="toggleView('products')">
-                    <i class="bi bi-box-seam me-1"></i>Products
-                </button>
-                <button class="btn btn-sm nav-tab-btn" id="tabCombos" onclick="toggleView('combos')">
-                    <i class="bi bi-collection me-1"></i>Combos
-                </button>
-                <button class="btn btn-sm nav-tab-btn" id="tabCustomers" onclick="toggleView('customers')">
-                    <i class="bi bi-people me-1"></i>Customers
-                </button>
-                <button class="btn btn-sm nav-tab-btn" id="tabDeals" onclick="toggleView('deals')">
-                    <i class="bi bi-clipboard2-check me-1"></i>Deals
-                    <span class="badge bg-warning text-dark ms-1" id="pendingCount" style="display:none">0</span>
-                </button>
-                <button class="btn btn-sm nav-tab-btn" id="tabChats" onclick="toggleView('chats')">
-                    <i class="bi bi-chat-dots me-1"></i>Chats
-                </button>
-                <button class="btn btn-sm nav-tab-btn" id="tabCustomTable" onclick="toggleView('customTable')">
-                    <i class="bi bi-tools me-1"></i>Custom Table
-                </button>
-                <div class="vr mx-2 bg-secondary"></div>
-                <button class="btn btn-warning btn-sm position-relative" onclick="toggleCart()">
-                    <i class="bi bi-cart3 me-1"></i>Cart
-                    <span class="badge bg-danger rounded-pill ms-1" id="cartCount">0</span>
-                </button>
-            </div>
-        </div>
-    </nav>
 
-    <div class="container-fluid px-4 py-4">
-        <!-- Shop View (default) -->
-        <div id="shopView">
+<nav class="navbar navbar-expand-lg navbar-dark" style="background:var(--bg-nav)">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand" href="#" onclick="go('dashboard')">
+            <i class="bi bi-grid-1x2-fill me-1"></i>POS
+        </a>
+        <div class="d-flex align-items-center gap-1">
+            <button class="btn btn-sm nav-tab-btn active" id="nav-dashboard" onclick="go('dashboard')">
+                <i class="bi bi-speedometer2 me-1"></i>Tổng quan
+            </button>
+            <button class="btn btn-sm nav-tab-btn" id="nav-products" onclick="go('products')">
+                <i class="bi bi-box-seam me-1"></i>Sản phẩm
+            </button>
+            <button class="btn btn-sm nav-tab-btn" id="nav-orders" onclick="go('orders')">
+                <i class="bi bi-receipt me-1"></i>Đơn hàng
+                <span class="nav-badge" id="pendingCount" style="display:none">0</span>
+            </button>
+            <button class="btn btn-sm nav-tab-btn" id="nav-customers" onclick="go('customers')">
+                <i class="bi bi-people me-1"></i>Khách hàng
+            </button>
+            <button class="btn btn-sm nav-tab-btn" id="nav-customtable" onclick="go('customTable')">
+                <i class="bi bi-tools me-1"></i>Báo giá
+            </button>
+            <div class="vr mx-2 bg-secondary opacity-25"></div>
+            <button class="btn btn-sm btn-warning position-relative" onclick="toggleCart()" style="font-weight:600">
+                <i class="bi bi-cart3 me-1"></i>Giỏ
+                <span class="badge bg-danger rounded-pill ms-1" id="cartCount" style="font-size:.6rem">0</span>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4 py-3">
+
+    <!-- ==================== TONG QUAN ==================== -->
+    <div id="view-dashboard">
+        <h5 class="mb-3 fw-bold">Tổng quan</h5>
+        <div class="stat-row" id="statsRow"></div>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Đơn hàng gần đây</span>
+                <button class="btn btn-sm btn-outline-primary" onclick="go('orders')">Xem tất cả</button>
+            </div>
+            <div class="card-body p-0" id="recentDeals"></div>
+        </div>
+    </div>
+
+    <!-- ==================== SAN PHAM (gộp Shop + Quản lý + Gói SP) ==================== -->
+    <div id="view-products" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 fw-bold">Sản phẩm</h5>
+            <button class="btn btn-sm btn-warning" onclick="toggleCart()" id="shopCartBtn">
+                <i class="bi bi-cart3 me-1"></i>Giỏ hàng <span class="badge bg-dark ms-1" id="shopCartCount">0</span>
+            </button>
+        </div>
+        <div class="sub-tabs">
+            <button class="sub-tab active" id="ptab-shop" onclick="showProductTab('shop')">Cửa hàng</button>
+            <button class="sub-tab" id="ptab-manage" onclick="showProductTab('manage')">Quản lý</button>
+            <button class="sub-tab" id="ptab-combos" onclick="showProductTab('combos')">Gói SP</button>
+            <button class="sub-tab" id="ptab-categories" onclick="showProductTab('categories')">Danh mục</button>
+        </div>
+
+        <!-- Shop sub-tab -->
+        <div id="ptabshop-content">
             <div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
-                <div class="input-group" style="max-width:320px">
-                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" id="shopSearch" placeholder="Search products..." oninput="applyShopFilters()">
+                <div class="input-group" style="max-width:280px">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="shopSearch" placeholder="Tìm sản phẩm..." oninput="applyShopFilters()">
                 </div>
-                <select class="form-select" id="shopCategoryFilter" onchange="applyShopFilters()" style="max-width:180px">
-                    <option value="">All Categories</option>
+                <select class="form-select" id="shopCategoryFilter" onchange="applyShopFilters()" style="max-width:160px">
+                    <option value="">Tất cả danh mục</option>
                 </select>
-                <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('shopSearch').value='';document.getElementById('shopCategoryFilter').value='';applyShopFilters()" title="Clear">
+                <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('shopSearch').value='';document.getElementById('shopCategoryFilter').value='';applyShopFilters()" title="Xoá">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
-            <div class="row g-2" id="shopGrid"></div>
+            <div class="product-grid" id="shopGrid"></div>
         </div>
 
-        <!-- Products View -->
-        <div id="productsView" style="display:none">
+        <!-- Manage sub-tab -->
+        <div id="ptabmanage-content" style="display:none">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0"><i class="bi bi-box-seam me-2"></i>Products</h4>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-success d-flex align-items-center gap-1" onclick="showAddModal()">
-                        <i class="bi bi-plus-circle-fill"></i> Add
-                    </button>
-                    <button class="btn btn-outline-secondary d-flex align-items-center gap-1" onclick="showImportModal()">
-                        <i class="bi bi-cloud-upload-fill"></i> Import
-                    </button>
+                    <div class="input-group" style="width:250px">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm..." oninput="clearTimeout(searchTimeout);searchTimeout=setTimeout(()=>applyFilters(),300)">
+                    </div>
+                    <select class="form-select" id="categoryFilter" onchange="applyFilters()" style="width:140px">
+                        <option value="">Tất cả</option>
+                    </select>
                 </div>
-            </div>
-            <div class="filter-bar mb-3">
-                <div class="row g-2 align-items-end">
-                    <div class="col-lg-4 col-md-6">
-                        <label class="filter-label"><i class="bi bi-search me-1"></i>Search</label>
-                        <input type="text" class="form-control" id="searchInput" placeholder="Type product name or category..." oninput="clearTimeout(searchTimeout);searchTimeout=setTimeout(()=>applyFilters(),300)">
-                    </div>
-                    <div class="col-lg-3 col-md-6">
-                        <label class="filter-label"><i class="bi bi-tag me-1"></i>Category</label>
-                        <select class="form-select" id="categoryFilter" onchange="applyFilters()">
-                            <option value="">All Categories</option>
-                        </select>
-                    </div>
-                    <div class="col-lg-2 col-md-4">
-                        <label class="filter-label"><i class="bi bi-cash me-1"></i>Min Price</label>
-                        <input type="number" class="form-control" id="priceMin" placeholder="From" min="0" oninput="applyFilters()">
-                    </div>
-                    <div class="col-lg-2 col-md-4">
-                        <label class="filter-label">Max Price</label>
-                        <input type="number" class="form-control" id="priceMax" placeholder="To" min="0" oninput="applyFilters()">
-                    </div>
-                    <div class="col-lg-1 col-md-2 col-3">
-                        <button class="btn btn-outline-secondary w-100" onclick="clearFilters()" title="Clear filters">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success btn-sm" onclick="showAddModal()">
+                        <i class="bi bi-plus-lg me-1"></i>Thêm
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="showImportModal()">
+                        <i class="bi bi-upload me-1"></i>Nhập file
+                    </button>
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle bg-white rounded shadow-sm" id="productTable">
-                    <thead class="table-light">
+                <table class="table table-hover bg-white rounded" style="border:1px solid var(--border)">
+                    <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th class="text-end">Price</th>
-                            <th class="text-end">Cost</th>
-                            <th>Description</th>
-                            <th class="text-center" style="width:120px">Actions</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Danh mục</th>
+                            <th>Kích thước</th>
+                            <th>Màu</th>
+                            <th class="text-end">Giá bán</th>
+                            <th class="text-end">Giá vốn</th>
+                            <th class="text-center" style="width:100px">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="productTableBody"></tbody>
@@ -121,24 +127,23 @@
             </div>
         </div>
 
-        <!-- Combos View -->
-        <div id="combosView" style="display:none">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0"><i class="bi bi-collection me-2"></i>Combos</h4>
-                <button class="btn btn-success d-flex align-items-center gap-1" onclick="showComboModal()">
-                    <i class="bi bi-plus-circle-fill"></i> Create Combo
+        <!-- Combos sub-tab -->
+        <div id="ptabcombos-content" style="display:none">
+            <div class="d-flex justify-content-end mb-3">
+                <button class="btn btn-success btn-sm" onclick="showComboModal()">
+                    <i class="bi bi-plus-lg me-1"></i>Tạo gói mới
                 </button>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle bg-white rounded shadow-sm">
-                    <thead class="table-light">
+                <table class="table table-hover bg-white rounded" style="border:1px solid var(--border)">
+                    <thead>
                         <tr>
-                            <th>Combo Name</th>
-                            <th>Products</th>
-                            <th class="text-end">Original Price</th>
-                            <th class="text-end">Combo Price</th>
-                            <th class="text-end">You Save</th>
-                            <th class="text-center" style="width:120px">Actions</th>
+                            <th>Tên gói</th>
+                            <th>Sản phẩm</th>
+                            <th class="text-end">Giá gốc</th>
+                            <th class="text-end">Giá gói</th>
+                            <th class="text-end">Tiết kiệm</th>
+                            <th class="text-center" style="width:100px">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="comboTableBody"></tbody>
@@ -146,629 +151,467 @@
             </div>
         </div>
 
-        <!-- Customers View -->
-        <div id="customersView" style="display:none">
+        <!-- Categories sub-tab -->
+        <div id="ptabcategories-content" style="display:none">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0"><i class="bi bi-people me-2"></i>Customers</h4>
-                <div class="input-group" style="width:250px">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" id="customerSearch" placeholder="Search customers..." oninput="filterCustomers()">
-                </div>
+                <h6 class="fw-bold mb-0">Quản lý danh mục</h6>
+                <button class="btn btn-success btn-sm" onclick="showAddCategoryModal()">
+                    <i class="bi bi-plus-lg me-1"></i>Thêm danh mục
+                </button>
             </div>
-            <div id="customersList"></div>
+            <div class="table-responsive">
+                <table class="table table-hover bg-white rounded" style="border:1px solid var(--border)">
+                    <thead>
+                        <tr>
+                            <th>Tên danh mục</th>
+                            <th class="text-center" style="width:100px">Thứ tự</th>
+                            <th class="text-center" style="width:100px">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoryTableBody"></tbody>
+                </table>
+            </div>
         </div>
+    </div>
 
-        <!-- Deals View -->
-        <div id="dealsView" style="display:none">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0"><i class="bi bi-clipboard2-check me-2"></i>Deals</h4>
-                <select class="form-select form-select-sm" id="dealStatusFilter" onchange="loadDeals()" style="width:160px">
-                    <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="returning">Returning</option>
-                    <option value="done">Done</option>
-                    <option value="fail">Fail</option>
+    <!-- ==================== DON HANG ==================== -->
+    <div id="view-orders" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0 fw-bold">Đơn hàng</h5>
+            <div class="d-flex gap-2 align-items-center">
+                <select class="form-select form-select-sm" id="dealStatusFilter" onchange="loadDeals()" style="width:170px">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="pending">Chờ xử lý</option>
+                    <option value="confirmed">Đã xác nhận</option>
+                    <option value="processing">Đang xử lý</option>
+                    <option value="shipping">Đang giao</option>
+                    <option value="delivered">Đã giao</option>
+                    <option value="completed">Hoàn thành</option>
+                    <option value="cancelled">Đã huỷ</option>
+                    <option value="returning">Đang hoàn trả</option>
+                    <option value="refunded">Đã hoàn tiền</option>
                 </select>
             </div>
-            <div id="dealsList"></div>
         </div>
-
-        <!-- Chats View -->
-        <div id="chatsView" style="display:none">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Chats</h4>
-                <div class="input-group" style="max-width:280px">
-                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" id="chatSearch" placeholder="Search customer..." oninput="renderChatList()">
-                </div>
-            </div>
-            <div id="chatList"></div>
-        </div>
-
-        <!-- Custom Table View -->
-        <div id="customTableView" style="display:none">
-            <div class="row g-4">
-                <!-- Builder Panel -->
-                <div class="col-lg-7">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-dark text-white">
-                            <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Custom Table Builder</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Table Name</label>
-                                <input type="text" class="form-control" id="ctName" placeholder="e.g., Office Desk XL" oninput="calcCustomTable()">
-                            </div>
-                            <hr>
-                            <h6 class="fw-bold"><i class="bi bi-tree me-1"></i> Wood Material</h6>
-                            <div class="row g-2 mb-3">
-                                <div class="col-12">
-                                    <select class="form-select" id="ctWood" onchange="calcCustomTable()">
-                                        <option value="">Select wood type...</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <h6 class="fw-bold"><i class="bi bi-rulers me-1"></i> Table Size (cm)</h6>
-                            <div class="row g-2 mb-3">
-                                <div class="col-4">
-                                    <label class="form-label small text-muted">Length</label>
-                                    <input type="number" class="form-control" id="ctLength" min="1" placeholder="120" oninput="calcCustomTable()">
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label small text-muted">Width</label>
-                                    <input type="number" class="form-control" id="ctWidth" min="1" placeholder="60" oninput="calcCustomTable()">
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label small text-muted">Area</label>
-                                    <input type="text" class="form-control" id="ctArea" readonly disabled>
-                                </div>
-                            </div>
-                            <hr>
-                            <h6 class="fw-bold"><i class="bi bi-columns-gap me-1"></i> Table Legs</h6>
-                            <div class="row g-2 mb-3">
-                                <div class="col-8">
-                                    <select class="form-select" id="ctLegs" onchange="calcCustomTable()">
-                                        <option value="">Select leg type...</option>
-                                    </select>
-                                </div>
-                                <div class="col-4">
-                                    <label class="form-label small text-muted">Qty</label>
-                                    <input type="number" class="form-control" id="ctLegQty" min="0" value="4" oninput="calcCustomTable()">
-                                </div>
-                            </div>
-                            <hr>
-                            <h6 class="fw-bold"><i class="bi bi-plus-circle me-1"></i> Extra Fees</h6>
-                            <div id="ctExtras">
-                                <div class="row g-2 mb-2 ct-extra-row">
-                                    <div class="col">
-                                        <input type="text" class="form-control form-control-sm ct-extra-name" placeholder="e.g., Finishing, Coating...">
-                                    </div>
-                                    <div class="col-4">
-                                        <input type="number" class="form-control form-control-sm ct-extra-price" placeholder="Fee (₫)" min="0" oninput="calcCustomTable()">
-                                    </div>
-                                    <div class="col-auto">
-                                        <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.ct-extra-row').remove();calcCustomTable()"><i class="bi bi-x-lg"></i></button>
-                                    </div>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary mt-1" onclick="addExtraRow()"><i class="bi bi-plus me-1"></i>Add Extra</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Summary & Settings Panel -->
-                <div class="col-lg-5">
-                    <!-- Price Summary -->
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-success text-white">
-                            <h6 class="mb-0"><i class="bi bi-calculator me-2"></i>Price Summary</h6>
-                        </div>
-                        <div class="card-body" id="ctSummary">
-                            <div class="text-muted text-center py-3">Select wood and size to see pricing</div>
-                        </div>
-                        <div class="card-footer">
-                            <button class="btn btn-warning w-100" onclick="addCustomTableToCart()">
-                                <i class="bi bi-cart-plus me-1"></i>Add to Cart
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Manage Wood Types -->
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-tree me-2"></i>Wood Types</h6>
-                            <button class="btn btn-sm btn-success" onclick="showWoodModal()"><i class="bi bi-plus-lg"></i></button>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="list-group list-group-flush" id="woodTypeList"></div>
-                        </div>
-                    </div>
-
-                    <!-- Manage Leg Types -->
-                    <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-columns-gap me-2"></i>Leg Types</h6>
-                            <button class="btn btn-sm btn-success" onclick="showLegModal()"><i class="bi bi-plus-lg"></i></button>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="list-group list-group-flush" id="legTypeList"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="stat-row mb-3" id="orderStats"></div>
+        <div id="dealsList"></div>
     </div>
 
-    <!-- Wood Type Modal -->
-    <div class="modal fade" id="woodModal" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h6 class="modal-title" id="woodModalTitle">Add Wood Type</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- ==================== KHACH HANG (gộp Customers + Chats) ==================== -->
+    <div id="view-customers" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0 fw-bold">Khách hàng</h5>
+            <div class="d-flex gap-2">
+                <div class="input-group" style="width:250px">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="customerSearch" placeholder="Tìm tên hoặc SĐT..." oninput="filterCustomers()">
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" id="woodId">
-                    <div class="mb-2">
-                        <label class="form-label">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="woodName" placeholder="e.g., Oak, Walnut">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Price per m² (₫)</label>
-                        <input type="number" class="form-control" id="woodPrice" min="0" step="1000">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Cost per m² (₫)</label>
-                        <input type="number" class="form-control" id="woodCost" min="0" step="1000">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Description</label>
-                        <input type="text" class="form-control" id="woodDesc">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary btn-sm" onclick="saveWoodType()">Save</button>
-                </div>
+                <button class="btn btn-success btn-sm" onclick="showAddCustomerModal()">
+                    <i class="bi bi-plus-lg me-1"></i>Thêm
+                </button>
             </div>
         </div>
+        <div id="customersList"></div>
     </div>
 
-    <!-- Leg Type Modal -->
-    <div class="modal fade" id="legModal" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h6 class="modal-title" id="legModalTitle">Add Leg Type</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="legId">
-                    <div class="mb-2">
-                        <label class="form-label">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="legName" placeholder="e.g., Hairpin, Tapered">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Price per leg (₫)</label>
-                        <input type="number" class="form-control" id="legPrice" min="0" step="1000">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Cost per leg (₫)</label>
-                        <input type="number" class="form-control" id="legCostPrice" min="0" step="1000">
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Description</label>
-                        <input type="text" class="form-control" id="legDesc">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary btn-sm" onclick="saveLegType()">Save</button>
-                </div>
+    <!-- ==================== HO TRO BAO GIA ==================== -->
+    <div id="view-customTable" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0 fw-bold">Hỗ trợ báo giá</h5>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="ctReadyMade" onchange="calcCustomTable()">
+                <label class="form-check-label fw-600" for="ctReadyMade">Bàn có sẵn (miễn sơn, giảm 15%)</label>
             </div>
         </div>
-    </div>
-
-    <!-- Add/Edit Product Modal -->
-    <div class="modal fade" id="productModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="productModalTitle">Add Product</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="productForm">
-                        <input type="hidden" id="productId">
+        <div class="row g-3">
+            <!-- COT TRAI: Thong so -->
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-body">
                         <div class="mb-3">
-                            <label for="productName" class="form-label">Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="productName" required>
+                            <label class="form-label">Tên sản phẩm</label>
+                            <input type="text" class="form-control" id="ctName" placeholder="VD: Bàn làm việc XL" oninput="calcCustomTable()">
                         </div>
-                        <div class="mb-3">
-                            <label for="productPrice" class="form-label">Price <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">₫</span>
-                                <input type="number" class="form-control" id="productPrice" step="1" min="0" required>
+                        <hr>
+                        <h6 class="fw-bold mb-2"><i class="bi bi-rulers me-1"></i>Kích thước (cm)</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-3">
+                                <label class="form-label">Dài</label>
+                                <input type="number" class="form-control" id="ctLength" min="1" placeholder="120" oninput="calcCustomTable()">
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label">Rộng</label>
+                                <input type="number" class="form-control" id="ctWidth" min="1" placeholder="60" oninput="calcCustomTable()">
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label">Dày</label>
+                                <input type="number" class="form-control" id="ctThickness" min="1" placeholder="5" oninput="calcCustomTable()">
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label">Thể tích</label>
+                                <input type="text" class="form-control" id="ctVolume" readonly disabled style="font-size:.78rem">
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="productCostPrice" class="form-label">Cost Price</label>
-                            <div class="input-group">
-                                <span class="input-group-text">₫</span>
-                                <input type="number" class="form-control" id="productCostPrice" step="1" min="0" placeholder="Your cost">
+                        <div class="alert alert-secondary py-2 mb-3" style="font-size:.75rem">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Đơn giá theo rộng:</strong>
+                            60=55tr · 70=80tr · 75=85tr · 80=90tr · 90=100tr · 100=110tr /m³
+                        </div>
+                        <hr>
+                        <!-- Chan ban -->
+                        <h6 class="fw-bold mb-2"><i class="bi bi-columns-gap me-1"></i>Chân bàn</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-8">
+                                <select class="form-select" id="ctLegs" onchange="calcCustomTable()">
+                                    <option value="">Không có chân</option>
+                                </select>
                             </div>
-                            <small class="text-muted">Your cost for profit tracking (not shown to customers)</small>
-                        </div>
-                        <div class="mb-3">
-                            <label for="productCategory" class="form-label">Category</label>
-                            <input type="text" class="form-control" id="productCategory" placeholder="e.g. Electronics">
-                        </div>
-                        <div class="mb-3">
-                            <label for="productDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="productDescription" rows="3"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveProduct()">
-                        <i class="bi bi-check-lg me-1"></i>Save
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Import Modal -->
-    <div class="modal fade" id="importModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Import Products</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <ul class="nav nav-tabs mb-3" role="tablist">
-                        <li class="nav-item">
-                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#fileTab">
-                                <i class="bi bi-file-earmark me-1"></i>File Upload
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#jsonTab">
-                                <i class="bi bi-braces me-1"></i>Paste JSON
-                            </button>
-                        </li>
-                    </ul>
-                    <div class="tab-content">
-                        <div class="tab-pane fade show active" id="fileTab">
-                            <div class="mb-3">
-                                <label for="importFile" class="form-label">Choose a JSON or CSV file</label>
-                                <input type="file" class="form-control" id="importFile" accept=".json,.csv">
-                            </div>
-                            <div class="alert alert-info small">
-                                <strong>CSV format:</strong> Must include headers: <code>name, price</code>. Optional: <code>description, category</code><br>
-                                <strong>JSON format:</strong> An array of objects with <code>name</code> and <code>price</code> fields.
-                            </div>
-                            <details class="mb-3">
-                                <summary class="text-muted small">Example CSV</summary>
-                                <pre class="bg-light p-2 rounded small mt-2">name,price,description,category
-Laptop,999.99,High-performance laptop,Electronics
-Headphones,49.99,Wireless Bluetooth,Electronics
-Coffee Mug,12.50,Ceramic 350ml,Kitchen</pre>
-                            </details>
-                            <details class="mb-3">
-                                <summary class="text-muted small">Example JSON</summary>
-                                <pre class="bg-light p-2 rounded small mt-2">[
-  {"name": "Laptop", "price": 999.99, "description": "High-performance laptop", "category": "Electronics"},
-  {"name": "Headphones", "price": 49.99, "description": "Wireless Bluetooth", "category": "Electronics"}
-]</pre>
-                            </details>
-                        </div>
-                        <div class="tab-pane fade" id="jsonTab">
-                            <div class="mb-3">
-                                <label for="jsonInput" class="form-label">Paste JSON array</label>
-                                <textarea class="form-control font-monospace" id="jsonInput" rows="8" placeholder='[{"name": "Product", "price": 9.99}]'></textarea>
+                            <div class="col-4">
+                                <input type="number" class="form-control" id="ctLegQty" min="0" value="4" placeholder="SL" oninput="calcCustomTable()">
                             </div>
                         </div>
-                    </div>
-                    <!-- Import Results -->
-                    <div id="importResults" class="d-none mt-3">
-                        <div class="alert" id="importAlert"></div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="importProducts()">
-                        <i class="bi bi-upload me-1"></i>Import
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteModal" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Delete <strong id="deleteProductName"></strong>?</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
-                        <i class="bi bi-trash me-1"></i>Delete
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Cart Sidebar -->
-    <div id="cartOverlay" class="cart-overlay" onclick="toggleCart()"></div>
-    <div id="cartSidebar" class="cart-sidebar">
-        <div class="cart-header">
-            <h5 class="mb-0"><i class="bi bi-cart3 me-2"></i>Deal Cart</h5>
-            <button class="btn-close" onclick="toggleCart()"></button>
-        </div>
-        <div class="cart-body" id="cartBody">
-            <div class="text-center text-muted py-5">
-                <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-                Cart is empty. Add products to start a deal.
-            </div>
-        </div>
-        <div class="cart-footer" id="cartFooter" style="display:none">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-muted">Items:</span>
-                <span id="cartItemCount" class="fw-semibold">0</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-muted">Subtotal:</span>
-                <span id="cartSubtotal" class="fw-semibold">0₫</span>
-            </div>
-            <div class="discount-section mb-2">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text"><i class="bi bi-percent"></i></span>
-                    <input type="number" class="form-control" id="discountInput" min="0" max="100" step="0.5" value="0" placeholder="Discount %" oninput="renderCart()">
-                    <span class="input-group-text">discount</span>
-                </div>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mb-2" id="discountRow" style="display:none!important">
-                <span class="text-danger">Discount:</span>
-                <span id="cartDiscount" class="text-danger fw-semibold">-0₫</span>
-            </div>
-            <div class="mb-2">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text"><i class="bi bi-truck"></i></span>
-                    <input type="number" class="form-control" id="shippingInput" min="0" step="1000" value="0" placeholder="Shipping fee" oninput="renderCart()">
-                    <span class="input-group-text">shipping</span>
-                </div>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fs-5 fw-bold">Total:</span>
-                <span class="fs-5 fw-bold text-success" id="cartTotal">0₫</span>
-            </div>
-            <div class="profit-section p-2 rounded mb-2" id="profitSection">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="small"><i class="bi bi-lock-fill me-1"></i>Your Profit:</span>
-                    <span id="cartProfit" class="fw-bold">0₫</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="small">Margin:</span>
-                    <span id="cartMargin" class="fw-semibold small">0%</span>
-                </div>
-            </div>
-            <button class="btn btn-success w-100 mb-2" onclick="showCheckoutModal()">
-                <i class="bi bi-bag-check me-1"></i>Checkout
-            </button>
-            <button class="btn btn-outline-primary w-100 mb-2" onclick="showDealSummary()">
-                <i class="bi bi-receipt me-1"></i>Deal Summary
-            </button>
-            <button class="btn btn-outline-danger w-100 mb-2" onclick="clearCart()">
-                <i class="bi bi-trash me-1"></i>Clear Cart
-            </button>
-        </div>
-    </div>
-
-    <!-- Deal Summary Modal -->
-    <div class="modal fade" id="dealSummaryModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><i class="bi bi-receipt me-2"></i>Deal Summary</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="dealSummaryBody"></div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="printDealSummary()">
-                        <i class="bi bi-printer me-1"></i>Print
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Checkout Modal -->
-    <div class="modal fade" id="checkoutModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="bi bi-bag-check me-2"></i>Checkout</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Customer Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="checkoutName" placeholder="Full name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Phone Number</label>
-                        <input type="tel" class="form-control" id="checkoutPhone" placeholder="Phone number">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Address</label>
-                        <textarea class="form-control" id="checkoutAddress" rows="2" placeholder="Delivery address"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Notes</label>
-                        <textarea class="form-control" id="checkoutNotes" rows="2" placeholder="Any special instructions..."></textarea>
-                    </div>
-                    <div class="alert alert-info small mb-0" id="checkoutSummary"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-success" onclick="submitDeal()">
-                        <i class="bi bi-check-lg me-1"></i>Confirm Deal
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Deal Detail Modal -->
-    <div class="modal fade" id="dealDetailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-clipboard2-data me-2"></i>Deal Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="dealDetailBody"></div>
-                <div class="modal-footer" id="dealDetailFooter"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Combo Modal -->
-    <div class="modal fade" id="comboModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="comboModalTitle"><i class="bi bi-collection me-2"></i>Create Combo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="comboId">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Combo Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="comboName" placeholder="e.g., Starter Pack">
+                        <hr>
+                        <!-- Nhieu ghe -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0"><i class="bi bi-handbag me-1"></i>Ghế đi kèm</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="addChairRow()"><i class="bi bi-plus-lg me-1"></i>Thêm ghế</button>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Combo Price (₫) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="comboPrice" min="0" step="1000" placeholder="Set combo price">
+                        <div id="ctChairRows"></div>
+                        <hr>
+                        <!-- Phi phat sinh -->
+                        <label class="form-label">Phí phát sinh</label>
+                        <div id="ctExtras">
+                            <div class="row g-2 mb-2 ct-extra-row">
+                                <div class="col"><input type="text" class="form-control form-control-sm ct-extra-name" placeholder="Tên phí..."></div>
+                                <div class="col-4"><input type="number" class="form-control form-control-sm ct-extra-price" placeholder="Giá" min="0" oninput="calcCustomTable()"></div>
+                                <div class="col-auto"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('.ct-extra-row').remove();calcCustomTable()"><i class="bi bi-x-lg"></i></button></div>
+                            </div>
                         </div>
+                        <button class="btn btn-sm btn-outline-primary mt-1" onclick="addExtraRow()"><i class="bi bi-plus me-1"></i>Thêm phí</button>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input type="text" class="form-control" id="comboDescription" placeholder="Optional description">
-                    </div>
-                    <hr>
-                    <h6><i class="bi bi-plus-circle me-1"></i>Add Products to Combo</h6>
-                    <div class="row g-2 mb-3 align-items-end">
-                        <div class="col">
-                            <select class="form-select" id="comboProductSelect">
-                                <option value="">Select a product...</option>
-                            </select>
-                        </div>
-                        <div class="col-auto" style="width:80px">
-                            <input type="number" class="form-control" id="comboProductQty" value="1" min="1">
-                        </div>
-                        <div class="col-auto">
-                            <button class="btn btn-primary" onclick="addComboItem()"><i class="bi bi-plus-lg"></i></button>
-                        </div>
-                    </div>
-                    <table class="table table-sm" id="comboItemsTable">
-                        <thead><tr><th>Product</th><th class="text-center" style="width:70px">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Line Total</th><th style="width:40px"></th></tr></thead>
-                        <tbody id="comboItemsBody"></tbody>
-                        <tfoot>
-                            <tr class="table-light">
-                                <td colspan="3" class="text-end fw-semibold">Original Total:</td>
-                                <td class="text-end fw-semibold" id="comboOriginalTotal">0₫</td>
-                                <td></td>
-                            </tr>
-                        </tfoot>
-                    </table>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveCombo()">
-                        <i class="bi bi-check-lg me-1"></i>Save Combo
-                    </button>
+            </div>
+            <!-- COT PHAI: Tong chi phi -->
+            <div class="col-lg-5">
+                <div class="card mb-3" style="position:sticky;top:1rem">
+                    <div class="card-header bg-success text-white"><i class="bi bi-calculator me-1"></i>Tổng chi phí</div>
+                    <div class="card-body" id="ctSummary">
+                        <div class="text-muted text-center py-3" style="font-size:.82rem">Nhập thông số để tính giá</div>
+                    </div>
+                    <div class="card-footer p-2">
+                        <button class="btn btn-warning w-100 btn-sm" onclick="addCustomTableToCart()">
+                            <i class="bi bi-cart-plus me-1"></i>Thêm vào giỏ
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Edit Customer Modal -->
-    <div class="modal fade" id="editCustomerModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Customer</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="editCustOriginalName">
-                    <div class="mb-3">
-                        <label class="form-label">Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="editCustName">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Phone</label>
-                        <input type="tel" class="form-control" id="editCustPhone">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Address</label>
-                        <textarea class="form-control" id="editCustAddress" rows="2"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="saveCustomer()">
-                        <i class="bi bi-check-lg me-1"></i>Save
-                    </button>
-                </div>
+<!-- ===== CART SIDEBAR ===== -->
+<div id="cartOverlay" class="cart-overlay" onclick="toggleCart()"></div>
+<div id="cartSidebar" class="cart-sidebar">
+    <div class="cart-header">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-cart3 me-1"></i>Giỏ hàng</h6>
+        <button class="btn-close btn-close-sm" onclick="toggleCart()"></button>
+    </div>
+    <div class="cart-body" id="cartBody">
+        <div class="empty-state"><i class="bi bi-cart-x"></i><p>Giỏ hàng trống</p></div>
+    </div>
+    <div class="cart-footer" id="cartFooter" style="display:none">
+        <div class="d-flex justify-content-between mb-1"><span class="text-muted">Sản phẩm:</span><span id="cartItemCount" class="fw-600">0</span></div>
+        <div class="d-flex justify-content-between mb-1"><span class="text-muted">Tạm tính:</span><span id="cartSubtotal" class="fw-600">0₫</span></div>
+        <div class="discount-section mb-1">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-percent"></i></span>
+                <input type="number" class="form-control" id="discountInput" min="0" max="100" step="0.5" value="0" placeholder="Giảm %" oninput="renderCart()">
+                <span class="input-group-text">%</span>
+            </div>
+        </div>
+        <div class="d-flex justify-content-between mb-1" id="discountRow" style="display:none!important">
+            <span class="text-danger">Giảm giá:</span><span id="cartDiscount" class="text-danger fw-600">-0₫</span>
+        </div>
+        <div class="mb-1">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-truck"></i></span>
+                <input type="number" class="form-control" id="shippingInput" min="0" step="1000" value="0" placeholder="Phí ship" oninput="renderCart()">
+                <span class="input-group-text">₫</span>
+            </div>
+        </div>
+        <div class="d-flex justify-content-between mb-1">
+            <span class="fw-bold">Tổng:</span>
+            <span class="fw-bold text-success" id="cartTotal" style="font-size:1.05rem">0₫</span>
+        </div>
+        <div class="profit-section p-2 rounded mb-2">
+            <div class="d-flex justify-content-between"><span class="small text-muted">Lợi nhuận:</span><span id="cartProfit" class="fw-600">0₫</span></div>
+            <div class="d-flex justify-content-between"><span class="small text-muted">Biên LN:</span><span id="cartMargin" class="small fw-600">0%</span></div>
+        </div>
+        <button class="btn btn-success w-100 mb-1 btn-sm" onclick="showCheckoutModal()">
+            <i class="bi bi-bag-check me-1"></i>Thanh toán
+        </button>
+        <button class="btn btn-outline-primary w-100 mb-1 btn-sm" onclick="showDealSummary()">
+            <i class="bi bi-receipt me-1"></i>Xem tóm tắt
+        </button>
+        <button class="btn btn-outline-danger w-100 btn-sm" onclick="clearCart()">
+            <i class="bi bi-trash me-1"></i>Xoá giỏ
+        </button>
+    </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Modal tóm tắt -->
+<div class="modal fade" id="dealSummaryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-receipt me-1"></i>Tóm tắt đơn hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="dealSummaryBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="printDealSummary()"><i class="bi bi-printer me-1"></i>In</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Delete Customer Confirmation Modal -->
-    <div class="modal fade" id="deleteCustomerModal" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Delete Customer</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Modal thanh toan -->
+<div class="modal fade" id="checkoutModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-bag-check me-1"></i>Thanh toán</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 position-relative">
+                    <label class="form-label">Tìm khách theo SĐT</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="tel" class="form-control" id="checkoutPhoneSearch" placeholder="Nhập SĐT..." oninput="debounceSearchCustomer()">
+                    </div>
+                    <div id="customerSearchResults" class="search-results" style="display:none"></div>
                 </div>
-                <div class="modal-body">
-                    <p>Delete <strong id="deleteCustName"></strong> and all their deals?</p>
-                    <p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle me-1"></i>This action cannot be undone.</p>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label">Tên khách <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="checkoutName" required>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteCustBtn">
-                        <i class="bi bi-trash me-1"></i>Delete
-                    </button>
+                <div class="mb-3">
+                    <label class="form-label">SĐT</label>
+                    <input type="tel" class="form-control" id="checkoutPhone">
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Địa chỉ</label>
+                    <textarea class="form-control" id="checkoutAddress" rows="2"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Ghi chú</label>
+                    <textarea class="form-control" id="checkoutNotes" rows="2"></textarea>
+                </div>
+                <div class="alert alert-info small mb-0" id="checkoutSummary"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-success btn-sm" onclick="submitDeal()"><i class="bi bi-check-lg me-1"></i>Xác nhận</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Toast -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div id="appToast" class="toast" role="alert">
-            <div class="toast-body d-flex align-items-center" id="toastBody"></div>
+<!-- Modal chi tiet don hang -->
+<div class="modal fade" id="dealDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-clipboard2-data me-1"></i>Chi tiết đơn hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="dealDetailBody"></div>
+            <div class="modal-footer" id="dealDetailFooter"></div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/app.js"></script>
+<!-- Modal them/sua san pham -->
+<div class="modal fade" id="productModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="productModalTitle">Thêm sản phẩm</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="productId">
+                <div class="row g-3">
+                    <div class="col-md-8"><label class="form-label">Tên SP <span class="text-danger">*</span></label><input type="text" class="form-control" id="productName" required></div>
+                    <div class="col-md-4"><label class="form-label">Danh mục <span class="text-danger">*</span></label><select class="form-select" id="productCategory" required><option value="">-- Chọn danh mục --</option></select></div>
+                    <div class="col-md-4"><label class="form-label">Giá bán <span class="text-danger">*</span></label><input type="number" class="form-control" id="productPrice" step="1" min="0" required></div>
+                    <div class="col-md-4"><label class="form-label">Giá vốn</label><input type="number" class="form-control" id="productCostPrice" step="1" min="0"></div>
+                    <div class="col-md-4"><label class="form-label">Kích thước</label><input type="text" class="form-control" id="productSize" placeholder="VD: XL"></div>
+                    <div class="col-md-6"><label class="form-label">Màu sắc</label><input type="text" class="form-control" id="productColor" placeholder="VD: Đen"></div>
+                    <div class="col-md-6"><label class="form-label">URL ảnh</label><input type="text" class="form-control" id="productImageUrl" placeholder="https://..."></div>
+                    <div class="col-12"><label class="form-label">Mô tả</label><textarea class="form-control" id="productDescription" rows="2"></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveProduct()"><i class="bi bi-check-lg me-1"></i>Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal nhap file -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Nhập sản phẩm</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#fileTab"><i class="bi bi-file-earmark me-1"></i>Tải file</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#jsonTab"><i class="bi bi-braces me-1"></i>Dán JSON</button></li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="fileTab">
+                        <input type="file" class="form-control mb-2" id="importFile" accept=".json,.csv">
+                        <small class="text-muted">CSV: <code>name, price, cost_price, category, size, color, image_url</code></small>
+                    </div>
+                    <div class="tab-pane fade" id="jsonTab">
+                        <textarea class="form-control font-monospace" id="jsonInput" rows="6" placeholder='[{"name":"SP","price":99000}]'></textarea>
+                    </div>
+                </div>
+                <div id="importResults" class="d-none mt-2"><div class="alert" id="importAlert"></div></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="importProducts()"><i class="bi bi-upload me-1"></i>Nhập</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xoa san pham -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Xoá sản phẩm</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body"><p>Xoá <strong id="deleteProductName"></strong>?</p></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn"><i class="bi bi-trash me-1"></i>Xoá</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal goi san pham -->
+<div class="modal fade" id="comboModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="comboModalTitle">Tạo gói sản phẩm</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="comboId">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6"><label class="form-label">Tên gói <span class="text-danger">*</span></label><input type="text" class="form-control" id="comboName"></div>
+                    <div class="col-md-3"><label class="form-label">Giá gói <span class="text-danger">*</span></label><input type="number" class="form-control" id="comboPrice" min="0" step="1000"></div>
+                    <div class="col-md-3"><label class="form-label">Mô tả</label><input type="text" class="form-control" id="comboDescription"></div>
+                </div>
+                <hr>
+                <div class="row g-2 mb-2 align-items-end">
+                    <div class="col"><select class="form-select" id="comboProductSelect"><option value="">Chọn sản phẩm...</option></select></div>
+                    <div class="col-auto" style="width:70px"><input type="number" class="form-control" id="comboProductQty" value="1" min="1"></div>
+                    <div class="col-auto"><button class="btn btn-primary btn-sm" onclick="addComboItem()"><i class="bi bi-plus-lg"></i></button></div>
+                </div>
+                <table class="table table-sm">
+                    <thead><tr><th>Sản phẩm</th><th class="text-center" style="width:60px">SL</th><th class="text-end">Đơn giá</th><th class="text-end">T.Tiền</th><th style="width:30px"></th></tr></thead>
+                    <tbody id="comboItemsBody"></tbody>
+                    <tfoot><tr><td colspan="3" class="text-end fw-600">Tổng:</td><td class="text-end fw-600" id="comboOriginalTotal">0₫</td><td></td></tr></tfoot>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveCombo()"><i class="bi bi-check-lg me-1"></i>Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal them/sua khach hang -->
+<div class="modal fade" id="addCustomerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addCustomerModalTitle">Thêm khách hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editCustId">
+                <div class="mb-3"><label class="form-label">Họ tên <span class="text-danger">*</span></label><input type="text" class="form-control" id="editCustName"></div>
+                <div class="mb-3"><label class="form-label">Số điện thoại</label><input type="tel" class="form-control" id="editCustPhone"></div>
+                <div class="mb-3"><label class="form-label">Địa chỉ</label><textarea class="form-control" id="editCustAddress" rows="2"></textarea></div>
+                <div class="mb-3"><label class="form-label">Ghi chú</label><textarea class="form-control" id="editCustNotes" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveCustomer()"><i class="bi bi-check-lg me-1"></i>Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xoa khach hang -->
+<div class="modal fade" id="deleteCustomerModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title fw-bold">Xoá khách hàng</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p>Xoá <strong id="deleteCustName"></strong> và tất cả đơn hàng?</p>
+                <p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Không thể hoàn tác.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Huỷ</button>
+                <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteCustBtn"><i class="bi bi-trash me-1"></i>Xoá</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal them/sua danh muc -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header"><h6 class="modal-title fw-bold" id="categoryModalTitle">Thêm danh mục</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="categoryId">
+                <div class="mb-2"><label class="form-label">Tên danh mục</label><input type="text" class="form-control" id="categoryName" placeholder="VD: Chân bàn, Ghế..."></div>
+                <div class="mb-2"><label class="form-label">Thứ tự hiển thị</label><input type="number" class="form-control" id="categorySort" min="0" value="0"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Huỷ</button>
+                <button class="btn btn-primary btn-sm" onclick="saveCategory()">Lưu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="appToast" class="toast" role="alert">
+        <div class="toast-body d-flex align-items-center" id="toastBody"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js"></script>
 </body>
 </html>
