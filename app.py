@@ -666,7 +666,7 @@ def deal_stats():
             SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
             SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
-            SUM(CASE WHEN status = 'returning' THEN 1 ELSE 0 END) as returning,
+            SUM(CASE WHEN status = 'returning' THEN 1 ELSE 0 END) as "returning",
             SUM(CASE WHEN status = 'refunded' THEN 1 ELSE 0 END) as refunded
            FROM deals"""
     ).fetchone()
