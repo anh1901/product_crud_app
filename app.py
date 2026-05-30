@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -1017,6 +1018,9 @@ def delete_combo(combo_id):
     return jsonify({"message": "Combo deleted"})
 
 
-if __name__ == "__main__":
+# Initialize DB on import (needed for Render/gunicorn)
+with app.app_context():
     init_db()
+
+if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
